@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    Test_PreprocessReader.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -64,7 +53,7 @@ namespace TestCommon
                 StripComments              = stripComments,
                 RemoveComments             = removeComments,
                 RemoveBlank                = removeBlank,
-                ProcessStatements            = processCommands,
+                ProcessCommands            = processCommands,
                 StatementMarker            = statementMarker,
                 Indent                     = indent,
                 LineEnding                 = lineEnding
@@ -138,7 +127,7 @@ namespace TestCommon
             var reader = new PreprocessReader(new StreamReader(new MemoryStream()));
 
             Assert.Equal(PreprocessReader.AngleVariableExpansionRegex, reader.VariableExpansionRegex);
-            Assert.True(reader.ProcessStatements);
+            Assert.True(reader.ProcessCommands);
             Assert.True(reader.StripComments);
             Assert.False(reader.RemoveComments);
             Assert.False(reader.RemoveBlank);
@@ -1182,23 +1171,6 @@ line3
             using (var reader = new PreprocessReader(input) { LineEnding = LineEnding.LF })
             {
                 Assert.Equal("line1\nline2\nline3\n", await reader.ReadToEndAsync());
-            }
-        }
-
-        [Fact]
-        [Trait(TestCategory.CategoryTrait, TestCategory.NeonCommon)]
-        public void DisableStatements()
-        {
-            const string input =
-@"# line1
-line2
-# line3
-";
-            using (var reader = new PreprocessReader(input) { LineEnding = LineEnding.CRLF })
-            {
-                reader.ProcessStatements = false;
-
-                Assert.Equal("# line1\r\nline2\r\n# line3\r\n", reader.ReadToEnd());
             }
         }
     }

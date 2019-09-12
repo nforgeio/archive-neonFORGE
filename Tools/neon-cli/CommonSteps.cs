@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    CommonSteps.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -24,9 +13,8 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 using Neon.IO;
-using System.Diagnostics.Contracts;
 
 namespace NeonCli
 {
@@ -38,17 +26,26 @@ namespace NeonCli
         /// <summary>
         /// Verifies that the node has the correct operating system installed.
         /// </summary>
-        /// <param name="node">The target cluster node.</param>
-        /// <param name="stepDelay">Ignored.</param>
-        public static void VerifyOS(SshProxy<NodeDefinition> node, TimeSpan stepDelay)
+        /// <param name="node">The target hive node.</param>
+        public static void VerifyOS(SshProxy<NodeDefinition> node)
         {
             node.Status = "check: OS";
 
-            // $todo(jeff.lill): We're currently hardcoded to Ubuntu 18.04.x
+            var response = node.SudoCommand("lsb_release -a");
 
-            if (!node.OsName.Equals("Ubuntu", StringComparison.InvariantCultureIgnoreCase) || node.OsVersion < Version.Parse("18.04"))
+            switch (Program.OSProperties.TargetOS)
             {
-                node.Fault("Expected: Ubuntu 18.04.x");
+                case TargetOS.Ubuntu_16_04:
+
+                    if (!response.OutputText.Contains("Ubuntu 16.04"))
+                    {
+                        node.Fault("Expected [Ubuntu 16.04].");
+                    }
+                    break;
+
+                default:
+
+                    throw new NotImplementedException($"Support for [{nameof(TargetOS)}.{Program.OSProperties.TargetOS}] is not implemented.");
             }
         }
 
@@ -56,8 +53,7 @@ namespace NeonCli
         /// Customizes the OpenSSH configuration on a node.
         /// </summary>
         /// <param name="node">The target node.</param>
-        /// <param name="stepDelayed">Ignored.</param>
-        public static void ConfigureOpenSSH(SshProxy<NodeDefinition> node, TimeSpan stepDelayed)
+        public static void ConfigureOpenSSH(SshProxy<NodeDefinition> node)
         {
             // Upload the OpenSSH server configuration, restart OpenSSH and
             // then disconnect and wait for the OpenSSH to restart.
@@ -169,11 +165,11 @@ TCPKeepAlive yes
 
         /// <summary>
         /// Configures the global environment variables that describe the configuration 
-        /// of the server within the cluster.
+        /// of the server within the hive.
         /// </summary>
         /// <param name="node">The server to be updated.</param>
-        /// <param name="clusterDefinition">The cluster definition.</param>
-        public static void ConfigureEnvironmentVariables(SshProxy<NodeDefinition> node, ClusterDefinition clusterDefinition)
+        /// <param name="hiveDefinition">The hive definition.</param>
+        public static void ConfigureEnvironmentVariables(SshProxy<NodeDefinition> node, HiveDefinition hiveDefinition)
         {
             node.Status = "environment variables";
 
@@ -199,9 +195,9 @@ TCPKeepAlive yes
                     {
                         if (line.StartsWith("PATH="))
                         {
-                            if (!line.Contains(KubeHostFolders.Bin))
+                            if (!line.Contains(HiveHostFolders.Tools))
                             {
-                                sb.AppendLine(line + $":/snap/bin:{KubeHostFolders.Bin}");
+                                sb.AppendLine(line + $":{HiveHostFolders.Tools}");
                             }
                             else
                             {
@@ -216,84 +212,122 @@ TCPKeepAlive yes
                 }
             }
 
-            // Add the global cluster related environment variables. 
+            // Add the global neonHIVE related environment variables. 
 
-            sb.AppendLine($"NEON_CLUSTER_PROVISIONER={clusterDefinition.Provisioner}");
-            sb.AppendLine($"NEON_CLUSTER={clusterDefinition.Name}");
-            sb.AppendLine($"NEON_DATACENTER={clusterDefinition.Datacenter.ToLowerInvariant()}");
-            sb.AppendLine($"NEON_ENVIRONMENT={clusterDefinition.Environment.ToString().ToLowerInvariant()}");
+            sb.AppendLine($"NEON_HIVE_PROVISIONER={hiveDefinition.Provisioner}");
+            sb.AppendLine($"NEON_HIVE={hiveDefinition.Name}");
+            sb.AppendLine($"NEON_DATACENTER={hiveDefinition.Datacenter.ToLowerInvariant()}");
+            sb.AppendLine($"NEON_ENVIRONMENT={hiveDefinition.Environment.ToString().ToLowerInvariant()}");
 
-            var sbPackageProxies = new StringBuilder();
-
-            foreach (var proxyEndpoint in clusterDefinition.PackageProxy.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            if (hiveDefinition.Hosting != null)
             {
-                sbPackageProxies.AppendWithSeparator(proxyEndpoint);
-            }
-            
-            sb.AppendLine($"NEON_PACKAGE_PROXY={sbPackageProxies}");
-
-            if (clusterDefinition.Hosting != null)
-            {
-                sb.AppendLine($"NEON_HOSTING={clusterDefinition.Hosting.Environment.ToMemberString().ToLowerInvariant()}");
+                sb.AppendLine($"NEON_HOSTING={hiveDefinition.Hosting.Environment.ToMemberString().ToLowerInvariant()}");
             }
 
             sb.AppendLine($"NEON_NODE_NAME={node.Name}");
+            sb.AppendLine($"NEON_NODE_FS={hiveDefinition.HiveFS.Enabled.ToString().ToLowerInvariant()}");
 
             if (node.Metadata != null)
             {
                 sb.AppendLine($"NEON_NODE_ROLE={node.Metadata.Role}");
                 sb.AppendLine($"NEON_NODE_IP={node.Metadata.PrivateAddress}");
-                sb.AppendLine($"NEON_NODE_HDD={node.Metadata.Labels.StorageHDD.ToString().ToLowerInvariant()}");
+                sb.AppendLine($"NEON_NODE_SSD={node.Metadata.Labels.StorageSSD.ToString().ToLowerInvariant()}");
+                sb.AppendLine($"NEON_NODE_SWAP={node.Metadata.Labels.ComputeSwap.ToString().ToLowerInvariant()}");
             }
 
-            sb.AppendLine($"NEON_ARCHIVE_FOLDER={KubeHostFolders.Archive}");
-            sb.AppendLine($"NEON_BIN_FOLDER={KubeHostFolders.Bin}");
-            sb.AppendLine($"NEON_CONFIG_FOLDER={KubeHostFolders.Config}");
-            sb.AppendLine($"NEON_EXEC_FOLDER={KubeHostFolders.Exec}");
-            sb.AppendLine($"NEON_SETUP_FOLDER={KubeHostFolders.Setup}");
-            sb.AppendLine($"NEON_STATE_FOLDER={KubeHostFolders.State}");
-            sb.AppendLine($"NEON_TMPFS_FOLDER={KubeHostFolders.Tmpfs}");
+            var sbNameservers = new StringBuilder();
 
-            // Kubernetes related variables for masters.
-
-            if (node.Metadata.IsMaster)
+            foreach (var nameServer in hiveDefinition.Network.Nameservers)
             {
-                sb.AppendLine($"KUBECONFIG=/etc/kubernetes/admin.conf");
+                sbNameservers.AppendWithSeparator(nameServer, ",");
+            }
+
+            sb.AppendLine($"NEON_UPSTREAM_DNS=\"{sbNameservers}\"");
+            sb.AppendLine($"NEON_APT_PROXY={HiveHelper.GetPackageProxyReferences(hiveDefinition)}");
+
+            sb.AppendLine($"NEON_ARCHIVE_FOLDER={HiveHostFolders.Archive}");
+            sb.AppendLine($"NEON_BIN_FOLDER={HiveHostFolders.Bin}");
+            sb.AppendLine($"NEON_CONFIG_FOLDER={HiveHostFolders.Config}");
+            sb.AppendLine($"NEON_EXEC_FOLDER={HiveHostFolders.Exec}");
+            sb.AppendLine($"NEON_SCRIPTS_FOLDER={HiveHostFolders.Scripts}");
+            sb.AppendLine($"NEON_SECRETS_FOLDER={HiveHostFolders.Secrets}");
+            sb.AppendLine($"NEON_SETUP_FOLDER={HiveHostFolders.Setup}");
+            sb.AppendLine($"NEON_SOURCE_FOLDER={HiveHostFolders.Source}");
+            sb.AppendLine($"NEON_STATE_FOLDER={HiveHostFolders.State}");
+            sb.AppendLine($"NEON_TMPFS_FOLDER={HiveHostFolders.Tmpfs}");
+            sb.AppendLine($"NEON_TOOLS_FOLDER={HiveHostFolders.Tools}");
+
+            // Append Consul and Vault addresses.
+
+            // All nodes will be configured such that host processes using the HashiCorp Consul 
+            // CLI will access the Consul cluster via local Consul instance.  This will be a 
+            // server for manager nodes and a proxy for workers and pets.
+
+            if (hiveDefinition.Consul.Tls)
+            {
+                sb.AppendLine($"CONSUL_HTTP_SSL=true");
+                sb.AppendLine($"CONSUL_HTTP_ADDR=" + $"{hiveDefinition.Hostnames.Consul}:{hiveDefinition.Consul.Port}");
+                sb.AppendLine($"CONSUL_HTTP_FULLADDR=" + $"https://{hiveDefinition.Hostnames.Consul}:{hiveDefinition.Consul.Port}");
+            }
+            else
+            {
+                sb.AppendLine($"CONSUL_HTTP_SSL=false");
+                sb.AppendLine($"CONSUL_HTTP_ADDR=" + $"{hiveDefinition.Hostnames.Consul}:{hiveDefinition.Consul.Port}");
+                sb.AppendLine($"CONSUL_HTTP_FULLADDR=" + $"http://{hiveDefinition.Hostnames.Consul}:{hiveDefinition.Consul.Port}");
+            }
+
+            // All nodes will be configured such that host processes using the HashiCorp Vault 
+            // CLI will access the Vault cluster via the [neon-proxy-vault] proxy service
+            // by default.
+
+            sb.AppendLine($"VAULT_ADDR={hiveDefinition.VaultProxyUri}");
+
+            if (node.Metadata != null)
+            {
+                if (node.Metadata.IsManager)
+                {
+                    // Manager hosts may use the [VAULT_DIRECT_ADDR] environment variable to 
+                    // access Vault without going through the [neon-proxy-vault] proxy.  This
+                    // points to the Vault instance running locally.
+                    //
+                    // This is useful when configuring Vault.
+
+                    sb.AppendLine($"VAULT_DIRECT_ADDR={hiveDefinition.GetVaultDirectUri(node.Name)}");
+                }
+                else
+                {
+                    sb.AppendLine($"VAULT_DIRECT_ADDR=");
+                }
             }
 
             // Upload the new environment to the server.
 
-            node.UploadText("/etc/environment", sb, tabStop: 4);
+            node.UploadText("/etc/environment", sb.ToString(), tabStop: 4);
         }
 
         /// <summary>
         /// Initializes a near virgin server with the basic capabilities required
-        /// for a cluster host node.
+        /// for a neonHIVE host node.
         /// </summary>
-        /// <param name="node">The target cluster node.</param>
-        /// <param name="clusterDefinition">The cluster definition.</param>
-        /// <param name="kubeSetupInfo">Kubernetes setup details.</param>
+        /// <param name="node">The target hive node.</param>
+        /// <param name="hiveDefinition">The hive definition.</param>
         /// <param name="shutdown">Optionally shuts down the node.</param>
-        public static void PrepareNode(SshProxy<NodeDefinition> node, ClusterDefinition clusterDefinition, KubeSetupInfo kubeSetupInfo, bool shutdown = false)
+        public static void PrepareNode(SshProxy<NodeDefinition> node, HiveDefinition hiveDefinition, bool shutdown = false)
         {
-            Covenant.Requires<ArgumentNullException>(node != null);
-            Covenant.Requires<ArgumentNullException>(clusterDefinition != null);
-            Covenant.Requires<ArgumentNullException>(kubeSetupInfo != null);
-
-            if (node.FileExists($"{KubeHostFolders.State}/setup/prepared"))
+            if (node.FileExists($"{HiveHostFolders.State}/setup/prepared"))
             {
                 return;     // Already prepared
             }
 
             //-----------------------------------------------------------------
-            // Ensure that the cluster host folders exist.
+            // Ensure that the hive host folders exist.
 
-            node.CreateHostFolders();
+            node.CreateHiveHostFolders();
 
             //-----------------------------------------------------------------
             // Package manager configuration.
 
-            if (!clusterDefinition.NodeOptions.AllowPackageManagerIPv6)
+            if (!hiveDefinition.HiveNode.AllowPackageManagerIPv6)
             {
                 // Restrict the [apt] package manager to using IPv4 to communicate
                 // with the package mirrors, since IPv6 often doesn't work.
@@ -304,19 +338,19 @@ TCPKeepAlive yes
 
             // Configure [apt] to retry.
 
-            node.UploadText("/etc/apt/apt.conf.d/99-retries", $"APT::Acquire::Retries \"{clusterDefinition.NodeOptions.PackageManagerRetries}\";");
+            node.UploadText("/etc/apt/apt.conf.d/99-retries", $"APT::Acquire::Retries \"{hiveDefinition.HiveNode.PackageManagerRetries}\";");
             node.SudoCommand("chmod 644 /etc/apt/apt.conf.d/99-retries");
 
             //-----------------------------------------------------------------
             // Other configuration.
 
-            ConfigureOpenSSH(node, TimeSpan.Zero);
-            node.UploadConfigFiles(clusterDefinition, kubeSetupInfo);
-            node.UploadResources(clusterDefinition, kubeSetupInfo);
+            ConfigureOpenSSH(node);
+            node.UploadConfigFiles(hiveDefinition);
+            node.UploadResources(hiveDefinition);
 
-            if (clusterDefinition != null)
+            if (hiveDefinition != null)
             {
-                ConfigureEnvironmentVariables(node, clusterDefinition);
+                ConfigureEnvironmentVariables(node, hiveDefinition);
             }
 
             node.SudoCommand("safe-apt-get update");
@@ -324,12 +358,12 @@ TCPKeepAlive yes
             node.InvokeIdempotentAction("setup/prep-node",
                 () =>
                 {
-                    node.Status = "preparing";
-                    node.SudoCommand("setup-prep.sh");
+                    node.Status = "run: setup-prep-node.sh";
+                    node.SudoCommand("setup-prep-node.sh");
                     node.Reboot(wait: true);
                 });
 
-            // We need to upload the cluster configuration and initialize drives attached 
+            // We need to upload the hive configuration and initialize drives attached 
             // to the node.  We're going to assume that these are not already initialized.
 
             // $todo(jeff.lill): 
@@ -338,20 +372,20 @@ TCPKeepAlive yes
             // based drive array or something.  I'm going to defer this to later and
             // concentrate on commodity hardware and cloud deployments for now. 
 
-            CommonSteps.ConfigureEnvironmentVariables(node, clusterDefinition);
+            CommonSteps.ConfigureEnvironmentVariables(node, hiveDefinition);
 
-            node.Status = "setup: disk";
+            node.Status = "run: setup-disk.sh";
             node.SudoCommand("setup-disk.sh");
 
             // Clear any DHCP leases to be super sure that cloned node
             // VMs will obtain fresh IP addresses.
 
-            node.Status = "clear: DHCP leases";
+            node.Status = "clear DHCP leases";
             node.SudoCommand("rm -f /var/lib/dhcp/*");
 
             // Indicate that the node has been fully prepared.
 
-            node.SudoCommand($"touch {KubeHostFolders.State}/setup/prepared");
+            node.SudoCommand($"touch {HiveHostFolders.State}/setup/prepared");
 
             // Shutdown the node if requested.
 

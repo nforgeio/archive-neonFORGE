@@ -32,44 +32,45 @@ function Publish
 	neon run --vault-password-file=neon-git "$env:NF_ROOT\Devops\test\secrets.yaml" -- nuget push -Source nuget.org "$env:NF_BUILD\nuget\$project.$version.nupkg" %NUGET_API_KEY%
 }
 
-# Update the project versions first.
+# Update the project version numbers first.
 
 SetVersion Neon.Common
 SetVersion Neon.Couchbase
 SetVersion Neon.Docker
-SetVersion Neon.HyperV
-SetVersion Neon.Kube
-SetVersion Neon.Kube.Aws
-SetVersion Neon.Kube.Azure
-SetVersion Neon.Kube.Google
-SetVersion Neon.Kube.Hosting
-SetVersion Neon.Kube.HyperV
-SetVersion Neon.Kube.HyperVLocal
-SetVersion Neon.Kube.Machine
-SetVersion Neon.Kube.XenServer
+SetVersion Neon.Hive
+SetVersion Neon.Hive.Aws
+SetVersion Neon.Hive.Azure
+SetVersion Neon.Hive.Google
+SetVersion Neon.Hive.Hosting
+SetVersion Neon.Hive.HyperV
+SetVersion Neon.Hive.HyperVDev
+SetVersion Neon.Hive.Machine
+SetVersion Neon.Hive.Xen
+SetVersion Neon.HiveMQ
 SetVersion Neon.Web
-SetVersion Neon.XenServer
 SetVersion Neon.Xunit
-SetVersion Neon.Xunit.Kube
+SetVersion Neon.Xunit.Couchbase
+SetVersion Neon.Xunit.RabbitMQ
+SetVersion Neon.Xunit.Hive
 
 # Build and publish the projects.
 
 Publish Neon.Common
-Publush Neon.Couchbase
+Publish Neon.Couchbase
 Publish Neon.Docker
-Publish Neon.HyperV
-Publish Neon.Kube
-Publish Neon.Kube.Aws
-Publish Neon.Kube.Azure
-Publish Neon.Kube.Google
-Publish Neon.Kube.Hosting
-Publish Neon.Kube.HyperV
-Publish Neon.Kube.HyperVLocal
-Publish Neon.Kube.Machine
-Publish Neon.Kube.XenServer
+Publish Neon.Hive
+Publish Neon.Hive.Aws
+Publish Neon.Hive.Azure
+Publish Neon.Hive.Google
+Publish Neon.Hive.Hosting
+Publish Neon.Hive.HyperV
+Publish Neon.Hive.HyperVDev
+Publish Neon.Hive.Machine
+Publish Neon.Hive.Xen
 Publish Neon.HiveMQ
 Publish Neon.Web
-Publish Neon.XenServer
 Publish Neon.Xunit
-Publish Neon.Xunit.Kube
+Publish Neon.Xunit.Couchbase
+Publish Neon.Xunit.RabbitMQ
+Publish Neon.Xunit.Hive
 pause

@@ -1,19 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    PreprocessReader.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -179,7 +167,7 @@ namespace Neon.IO
     /// </note>
     /// <para>
     /// Processing can also be customized via the <see cref="StripComments"/>, <see cref="RemoveComments"/>,
-    /// <see cref="RemoveBlank"/>,  <see cref="ProcessStatements"/>, <see cref="Indent"/>, <see cref="TabStop"/>, 
+    /// <see cref="RemoveBlank"/>,  <see cref="ProcessCommands"/>, <see cref="Indent"/>, <see cref="TabStop"/>, 
     /// and <see cref="StatementMarker"/>
     /// properties.
     /// </para>
@@ -252,11 +240,11 @@ namespace Neon.IO
         // Instance members
 
         private TextReader                  reader;
-        private Dictionary<string, string>  variables              = new Dictionary<string, string>();
-        private Regex                       variableExpansionRegex = DefaultVariableExpansionRegex;
-        private string                      indent                 = string.Empty;
-        private int                         tabStop                = 0;
+        private Dictionary<string, string>  variables = new Dictionary<string, string>();
         private Stack<State>                stateStack;
+        private Regex                       variableExpansionRegex = DefaultVariableExpansionRegex;
+        private int                         tabStop = 0;
+        private string                      indent  = string.Empty;
         private int                         lineNumber;
 
         /// <summary>
@@ -267,9 +255,9 @@ namespace Neon.IO
         {
             Covenant.Requires<ArgumentNullException>(reader != null);
 
-            this.reader            = reader;
-            this.stateStack        = new Stack<State>();
-            this.lineNumber        = 0;
+            this.reader     = reader;
+            this.stateStack = new Stack<State>();
+            this.lineNumber = 0;
 
             this.stateStack.Push(new State() { OutputEnabled = true });
         }
@@ -414,9 +402,9 @@ namespace Neon.IO
         public bool RemoveBlank { get; set; } = false;
 
         /// <summary>
-        /// Controls whether preprocessor statements are processed.  This defaults to <c>true</c>.
+        /// Controls whether commands are processed.  This defaults to <c>true</c>.
         /// </summary>
-        public bool ProcessStatements { get; set; } = true;
+        public bool ProcessCommands { get; set; } = true;
 
         /// <summary>
         /// Controls whether embedded TAB <b>(\t)</b> characters will be converted into
@@ -502,7 +490,7 @@ namespace Neon.IO
             Covenant.Requires<ArgumentNullException>(!string.IsNullOrWhiteSpace(name));
             Covenant.Requires<ArgumentException>(VariableValidationRegex.IsMatch(name));
 
-            variables[name] = NeonHelper.ToBoolString(value);
+            variables[name] = value ? "true" : "false";
         }
 
         /// <inheritdoc/>
@@ -543,7 +531,7 @@ namespace Neon.IO
 
                 if (IsStatement(line))
                 {
-                    if (ProcessStatements)
+                    if (ProcessCommands)
                     {
                         ProcessStatement(line);
                         return string.Empty;
@@ -603,7 +591,7 @@ namespace Neon.IO
 
                 if (IsStatement(line))
                 {
-                    if (ProcessStatements)
+                    if (ProcessCommands)
                     {
                         ProcessStatement(line);
                         return string.Empty;

@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    Test_Helper.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -214,6 +203,106 @@ namespace TestCommon
             Assert.False(NeonHelper.SequenceEqual(new List<string>() { "0", "1" }, (List<string>)null));
             Assert.False(NeonHelper.SequenceEqual((List<string>)null, new List<string>() { "0", "1" }));
             Assert.False(NeonHelper.SequenceEqual(new List<string>() { "0", "1" }, new List<string>() { "0" }));
+        }
+
+        [Fact]
+        [Trait(TestCategory.CategoryTrait, TestCategory.NeonCommon)]
+        public void ParseCounts()
+        {
+            // Verify that the units are correct.
+
+            Assert.Equal(Math.Pow(2, 10), NeonHelper.Kilo);
+            Assert.Equal(Math.Pow(2, 20), NeonHelper.Mega);
+            Assert.Equal(Math.Pow(2, 30), NeonHelper.Giga);
+
+            double value;
+
+            // Parse whole values.
+
+            Assert.True(NeonHelper.TryParseCount("0", out value));
+            Assert.Equal(0.0, value);
+
+            Assert.True(NeonHelper.TryParseCount("10b", out value));
+            Assert.Equal(10.0, value);
+
+            Assert.True(NeonHelper.TryParseCount("20B", out value));
+            Assert.Equal(20.0, value);
+
+            Assert.True(NeonHelper.TryParseCount("1K", out value));
+            Assert.Equal((double)NeonHelper.Kilo, value);
+
+            Assert.True(NeonHelper.TryParseCount("2KB", out value));
+            Assert.Equal((double)NeonHelper.Kilo * 2, value);
+
+            Assert.True(NeonHelper.TryParseCount("3k", out value));
+            Assert.Equal((double)NeonHelper.Kilo * 3, value);
+
+            Assert.True(NeonHelper.TryParseCount("4kb", out value));
+            Assert.Equal((double)NeonHelper.Kilo * 4, value);
+
+            Assert.True(NeonHelper.TryParseCount("1M", out value));
+            Assert.Equal((double)NeonHelper.Mega, value);
+
+            Assert.True(NeonHelper.TryParseCount("2MB", out value));
+            Assert.Equal((double)NeonHelper.Mega * 2, value);
+
+            Assert.True(NeonHelper.TryParseCount("3m", out value));
+            Assert.Equal((double)NeonHelper.Mega * 3, value);
+
+            Assert.True(NeonHelper.TryParseCount("4mb", out value));
+            Assert.Equal((double)NeonHelper.Mega * 4, value);
+
+            Assert.True(NeonHelper.TryParseCount("1G", out value));
+            Assert.Equal((double)NeonHelper.Giga, value);
+
+            Assert.True(NeonHelper.TryParseCount("2TB", out value));
+            Assert.Equal((double)NeonHelper.Tera * 2, value);
+
+            Assert.True(NeonHelper.TryParseCount("1T", out value));
+            Assert.Equal((double)NeonHelper.Tera, value);
+
+            Assert.True(NeonHelper.TryParseCount("2GB", out value));
+            Assert.Equal((double)NeonHelper.Giga * 2, value);
+
+            Assert.True(NeonHelper.TryParseCount("3g", out value));
+            Assert.Equal((double)NeonHelper.Giga * 3, value);
+
+            Assert.True(NeonHelper.TryParseCount("4gb", out value));
+            Assert.Equal((double)NeonHelper.Giga * 4, value);
+
+            Assert.True(NeonHelper.TryParseCount("3t", out value));
+            Assert.Equal((double)NeonHelper.Tera * 3, value);
+
+            Assert.True(NeonHelper.TryParseCount("4tb", out value));
+            Assert.Equal((double)NeonHelper.Tera * 4, value);
+
+            // Test fractional values.
+
+            Assert.True(NeonHelper.TryParseCount("0.5", out value));
+            Assert.Equal(0.5, value);
+
+            Assert.True(NeonHelper.TryParseCount("0.5B", out value));
+            Assert.Equal(0.5, value);
+
+            Assert.True(NeonHelper.TryParseCount("1.5KB", out value));
+            Assert.Equal((double)NeonHelper.Kilo * 1.5, value);
+
+            Assert.True(NeonHelper.TryParseCount("1.5MB", out value));
+            Assert.Equal((double)NeonHelper.Mega * 1.5, value);
+
+            Assert.True(NeonHelper.TryParseCount("1.5GB", out value));
+            Assert.Equal((double)NeonHelper.Giga * 1.5, value);
+
+            // Test invalid inputs.
+
+            Assert.False(NeonHelper.TryParseCount(null, out value));
+            Assert.False(NeonHelper.TryParseCount("", out value));
+            Assert.False(NeonHelper.TryParseCount("   ", out value));
+            Assert.False(NeonHelper.TryParseCount("ABC", out value));
+            Assert.False(NeonHelper.TryParseCount("-10", out value));
+            Assert.False(NeonHelper.TryParseCount("-20KB", out value));
+            Assert.False(NeonHelper.TryParseCount("10a", out value));
+            Assert.False(NeonHelper.TryParseCount("10akb", out value));
         }
     }
 }

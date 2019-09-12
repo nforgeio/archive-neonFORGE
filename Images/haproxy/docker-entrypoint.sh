@@ -2,24 +2,23 @@
 #------------------------------------------------------------------------------
 # FILE:         docker-entrypoint.sh
 # CONTRIBUTOR:  Jeff Lill
-# COPYRIGHT:    Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
+# COPYRIGHT:    Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-
 # Loads the Docker host node environment variables before launching HAProxy.
 
 # Add the root directory to the PATH.
 
 PATH=${PATH}:/
+
+# Load the host node environment.
+
+if [ -f /etc/neon/host-env ] ; then
+    . /etc/neon/host-env
+fi
+
+# Load the neonHIVE constants.
+
+. /neonhive.sh
 
 # Initialize the configuration file check interval.
 
@@ -56,7 +55,8 @@ fi
 
 . log-info.sh "Starting HAProxy."
 
-haproxy -f ${configPath} &
+haproxyCommand="haproxy -f ${configPath} $@"
+eval ${haproxyCommand}
 
 # Monitor the configuration for changes and restart the proxy when we see any.
 # Note that we'll report an error if the new configuration is invalid but we'll
@@ -82,7 +82,11 @@ do
 
             # Restart with the new config
 
-            haproxy -f ${configPath} -sf $(pidof haproxy)
+            if ! eval ${haproxyCommand} -sf $(pidof haproxy) ; then
+                
+                . log-error.sh "Unable to restart HAProxy even though the configuration checked out.  Container will terminate."
+                exit 1
+            fi
         else
             . log-error.sh "Invalid HAProxy configuration change.  Retaining the old configuration."
         fi

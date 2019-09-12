@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    SshCommand.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -28,7 +17,7 @@ using Newtonsoft;
 using Newtonsoft.Json;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
@@ -38,8 +27,8 @@ namespace NeonCli
     public class SshCommand : CommandBase
     {
         private const string usage = @"
-Opens a PuTTY SSH connection to the named node in the current cluster
-or the first master when no node is specified.
+Opens a PuTTY SSH connection to the named node in the current hive
+or the first manager node if no node is specified.
 
 USAGE:
 
@@ -47,8 +36,8 @@ USAGE:
 
 ARGUMENTS:
 
-    NODE        - Optionally names the target node.
-                  This defaults to the first master.
+    NODE        - Optionally names the target hive node.
+                  Otherwise, the first manager node will be opened.
 ";
         /// <inheritdoc/>
         public override string[] Words
@@ -71,24 +60,23 @@ ARGUMENTS:
                 Program.Exit(0);
             }
 
-            var cluster    = Program.GetCluster();
-            var extensions = KubeHelper.CurrentContext.Extensions;
+            var hiveLogin = Program.ConnectHive();
 
             NodeDefinition node;
 
             if (commandLine.Arguments.Length == 0)
             {
-                node = cluster.GetReachableMaster().Metadata;
+                node = HiveHelper.Hive.GetReachableManager().Metadata;
             }
             else
             {
                 var name = commandLine.Arguments[0];
 
-                node = cluster.Definition.Nodes.SingleOrDefault(n => n.Name == name);
+                node = hiveLogin.Definition.Nodes.SingleOrDefault(n => n.Name == name);
 
                 if (node == null)
                 {
-                    Console.Error.WriteLine($"*** ERROR: The node [{name}] was not found.");
+                    Console.Error.WriteLine($"*** ERROR: The node [{name}] does not exist.");
                     Program.Exit(1);
                 }
             }
@@ -103,25 +91,25 @@ ARGUMENTS:
             int             startPos;
             int             endPos;
 
-            startPos = extensions.SshNodeFingerprint.IndexOf(md5Pattern);
+            startPos = hiveLogin.SshHiveHostKeyFingerprint.IndexOf(md5Pattern);
 
             if (startPos == -1)
             {
-                Console.Error.WriteLine($"*** ERROR: Cannot parse host's SSH key fingerprint [{extensions.SshNodeFingerprint}].");
+                Console.Error.WriteLine($"*** ERROR: Cannot parse host's SSH key fingerprint [{hiveLogin.SshHiveHostKeyFingerprint}].");
                 Program.Exit(1);
             }
 
             startPos += md5Pattern.Length;
 
-            endPos = extensions.SshNodeFingerprint.IndexOf(' ', startPos);
+            endPos = hiveLogin.SshHiveHostKeyFingerprint.IndexOf(' ', startPos);
 
             if (endPos == -1)
             {
-                fingerprint = extensions.SshNodeFingerprint.Substring(startPos).Trim();
+                fingerprint = hiveLogin.SshHiveHostKeyFingerprint.Substring(startPos).Trim();
             }
             else
             {
-                fingerprint = extensions.SshNodeFingerprint.Substring(startPos, endPos - startPos).Trim();
+                fingerprint = hiveLogin.SshHiveHostKeyFingerprint.Substring(startPos, endPos - startPos).Trim();
             }
 
             // Launch PuTTY.
@@ -132,7 +120,71 @@ ARGUMENTS:
                 Program.Exit(1);
             }
 
-            Process.Start(Program.PuttyPath, $"-l {extensions.SshUsername} -pw {extensions.SshPassword} {node.PrivateAddress}:22 -hostkey \"{fingerprint}\"");
+            switch (hiveLogin.Definition.HiveNode.SshAuth)
+            {
+                case AuthMethods.Tls:
+
+                    // We're going write the private key to the hive temp folder.  For Windows
+                    // workstations, this is probably encrypted and hopefully Linux/OSX is configured
+                    // to encrypt user home directories.  We want to try to avoid persisting unencrypted
+                    // hive credentials.
+
+                    // $todo(jeff.lill):
+                    //
+                    // On Linux/OSX, investigate using the [/dev/shm] tmpfs volume.
+
+                    if (string.IsNullOrEmpty(hiveLogin.SshClientKey.PrivatePPK))
+                    {
+                        // The hive must have been setup from a non-Windows workstation because
+                        // there's no PPK formatted key that PuTTY/WinSCP require.  We'll use
+                        // WinSCP] to do the conversion.
+
+                        hiveLogin.SshClientKey.PrivatePPK = Program.ConvertPUBtoPPK(hiveLogin, hiveLogin.SshClientKey.PrivatePEM);
+                        hiveLogin.Path                    = Program.GetHiveLoginPath(hiveLogin.Username, hiveLogin.Definition.Name);
+
+                        // Update the login information.
+
+                        hiveLogin.Save();
+                    }
+
+                    var keyPath = Path.Combine(Program.HiveTempFolder, $"{hiveLogin.HiveName}.key");
+
+                    File.WriteAllText(keyPath, hiveLogin.SshClientKey.PrivatePPK);
+
+                    try
+                    {
+                        Process.Start(Program.PuttyPath, $"-l {hiveLogin.SshUsername} -i \"{keyPath}\" {node.PrivateAddress}:22 -hostkey \"{fingerprint}\"");
+                    }
+                    finally
+                    {
+                        // Wait a bit for PuTTY to start and then delete the key.
+
+                        while (true)
+                        {
+                            Thread.Sleep(TimeSpan.FromSeconds(5));
+
+                            try
+                            {
+                                File.Delete(keyPath);
+                                break;
+                            }
+                            catch
+                            {
+                                // Intentionally ignoring this.
+                            }
+                        }
+                    }
+                    break;
+
+                case AuthMethods.Password:
+
+                    Process.Start(Program.PuttyPath, $"-l {hiveLogin.SshUsername} -pw {hiveLogin.SshPassword} {node.PrivateAddress}:22 -hostkey \"{fingerprint}\"");
+                    break;
+
+                default:
+
+                    throw new NotSupportedException($"Unsupported SSH authentication method [{hiveLogin.Definition.HiveNode.SshAuth}].");
+            }
         }
 
         /// <inheritdoc/>

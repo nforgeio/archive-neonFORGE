@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    ScpCommand.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -28,7 +17,7 @@ using Newtonsoft;
 using Newtonsoft.Json;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
@@ -38,22 +27,32 @@ namespace NeonCli
     public class ScpCommand : CommandBase
     {
         private const string usage = @"
-Opens a WinSCP connection to the named node in the current cluster
-or the first master when no node is specified.
+Opens a WinSCP connection to the named node in the current hive
+or the first manager node if no node is specified.
 
 USAGE:
 
-    neon scp [NODE]
+    neon scp [--console] [NODE]
 
 ARGUMENTS:
 
-    NODE        - Optionally names the target node.
-                  This defaults to the first master.
+    NODE        - Optionally names the target hive node.
+                  Otherwise, the first manager node will be opened.
+
+OPTIONS:
+
+    --console       - Opens a command line Window.
 ";
         /// <inheritdoc/>
         public override string[] Words
         {
             get { return new string[] { "scp" }; }
+        }
+
+        /// <inheritdoc/>
+        public override string[] ExtendedOptions
+        {
+            get { return new string[] { "--console" }; }
         }
 
         /// <inheritdoc/>
@@ -71,27 +70,28 @@ ARGUMENTS:
                 Program.Exit(0);
             }
 
-            var cluster    = Program.GetCluster();
-            var extensions = KubeHelper.CurrentContext.Extensions;
+            var hiveLogin = Program.ConnectHive();
 
             NodeDefinition node;
 
             if (commandLine.Arguments.Length == 0)
             {
-                node = cluster.GetReachableMaster().Metadata;
+                node = HiveHelper.Hive.GetReachableManager().Metadata;
             }
             else
             {
                 var name = commandLine.Arguments[0];
 
-                node = cluster.Definition.Nodes.SingleOrDefault(n => n.Name == name);
+                node = hiveLogin.Definition.Nodes.SingleOrDefault(n => n.Name == name);
 
                 if (node == null)
                 {
-                    Console.Error.WriteLine($"*** ERROR: The node [{name}] was not found.");
+                    Console.Error.WriteLine($"*** ERROR: The node [{name}] does not exist.");
                     Program.Exit(1);
                 }
             }
+
+            var consoleOption = commandLine.GetOption("--console") != null ? "/console" : string.Empty;
 
             // The host's SSH key fingerprint looks something like the example below.
             // We need to extract extract the bitcount and MD5 hash to generate a
@@ -106,33 +106,33 @@ ARGUMENTS:
             int             startPos;
             int             endPos;
 
-            endPos = extensions.SshNodeFingerprint.IndexOf(' ');
+            endPos = hiveLogin.SshHiveHostKeyFingerprint.IndexOf(' ');
 
-            if (!int.TryParse(extensions.SshNodeFingerprint.Substring(0, endPos), out bitCount) || bitCount <= 0)
+            if (!int.TryParse(hiveLogin.SshHiveHostKeyFingerprint.Substring(0, endPos), out bitCount) || bitCount <= 0)
             {
-                Console.Error.WriteLine($"*** ERROR: Cannot parse host's SSH key fingerprint [{extensions.SshNodeFingerprint}].");
+                Console.Error.WriteLine($"*** ERROR: Cannot parse host's SSH key fingerprint [{hiveLogin.SshHiveHostKeyFingerprint}].");
                 Program.Exit(1);
             }
 
-            startPos = extensions.SshNodeFingerprint.IndexOf(md5Pattern);
+            startPos = hiveLogin.SshHiveHostKeyFingerprint.IndexOf(md5Pattern);
 
             if (startPos == -1)
             {
-                Console.Error.WriteLine($"*** ERROR: Cannot parse host's SSH key fingerprint [{extensions.SshNodeFingerprint}].");
+                Console.Error.WriteLine($"*** ERROR: Cannot parse host's SSH key fingerprint [{hiveLogin.SshHiveHostKeyFingerprint}].");
                 Program.Exit(1);
             }
 
             startPos += md5Pattern.Length;
 
-            endPos = extensions.SshNodeFingerprint.IndexOf(' ', startPos);
+            endPos = hiveLogin.SshHiveHostKeyFingerprint.IndexOf(' ', startPos);
 
             if (endPos == -1)
             {
-                md5 = extensions.SshNodeFingerprint.Substring(startPos).Trim();
+                md5 = hiveLogin.SshHiveHostKeyFingerprint.Substring(startPos).Trim();
             }
             else
             {
-                md5 = extensions.SshNodeFingerprint.Substring(startPos, endPos - startPos).Trim();
+                md5 = hiveLogin.SshHiveHostKeyFingerprint.Substring(startPos, endPos - startPos).Trim();
             }
 
             fingerprint = $"ssh-rsa {bitCount} {md5}";
@@ -145,7 +145,82 @@ ARGUMENTS:
                 Program.Exit(1);
             }
 
-            Process.Start(Program.WinScpPath, $@"scp://{extensions.SshUsername}:{extensions.SshPassword}@{node.PrivateAddress}:22 /hostkey=""{fingerprint}"" /newinstance /rawsettings Shell=""sudo%20-s"" compression=1");
+            switch (hiveLogin.Definition.HiveNode.SshAuth)
+            {
+                case AuthMethods.Tls:
+
+                    // We're going write the private key to the hive temp folder.  For Windows
+                    // workstations, this is probably encrypted and hopefully Linux/OSX is configured
+                    // to encrypt user home directories.  We want to try to avoid persisting unencrypted
+                    // hive credentials.
+
+                    // $todo(jeff.lill):
+                    //
+                    // On Linux/OSX, investigate using the [/dev/shm] tmpfs volume.
+
+                    if (string.IsNullOrEmpty(hiveLogin.SshClientKey.PrivatePPK))
+                    {
+                        // The hive must have been setup from a non-Windows workstation because
+                        // there's no PPK formatted key that PuTTY/WinSCP require.  We'll use
+                        // WinSCP] to do the conversion.
+
+                        hiveLogin.SshClientKey.PrivatePPK = Program.ConvertPUBtoPPK(hiveLogin, hiveLogin.SshClientKey.PrivatePEM);
+                        hiveLogin.Path                    = Program.GetHiveLoginPath(hiveLogin.Username, hiveLogin.Definition.Name);
+
+                        // Update the login information.
+
+                        hiveLogin.Save();
+                    }
+
+                    var keyPath = Path.Combine(Program.HiveTempFolder, $"{hiveLogin.HiveName}.key");
+
+                    File.WriteAllText(keyPath, hiveLogin.SshClientKey.PrivatePPK);
+
+                    try
+                    {
+                        Process.Start(Program.WinScpPath, $@"scp://{hiveLogin.SshUsername}@{node.PrivateAddress}:22 /privatekey=""{keyPath}"" /hostkey=""{fingerprint}"" /newinstance {consoleOption} /rawsettings Shell=""sudo%20-s"" compression=1");
+                    }
+                    finally
+                    {
+                        // $todo(jeff.lill):
+                        //
+                        // We really need to delete the key, leaving this hanging around
+                        // is a security risk.  Unfortunately, the code below doesn't work
+                        // because WinSCP doesn't seen to hold the key in RAM like it
+                        // does with passwords.
+                        //
+                        // This results in an authentication failure whenever an operation
+                        // is performed that would require SUDO access.
+#if TODO
+                        // Wait a bit for WinSCP to start and then delete the key.
+
+                        while (true)
+                        {
+                            Thread.Sleep(TimeSpan.FromSeconds(5));
+
+                            try
+                            {
+                                File.Delete(keyPath);
+                                break;
+                            }
+                            catch
+                            {
+                                // Intentionally ignoring this.
+                            }
+                        }
+#endif
+                    }
+                    break;
+
+                case AuthMethods.Password:
+
+                    Process.Start(Program.WinScpPath, $@"scp://{hiveLogin.SshUsername}:{hiveLogin.SshPassword}@{node.PrivateAddress}:22 /hostkey=""{fingerprint}"" /newinstance {consoleOption} /rawsettings Shell=""sudo%20-s"" compression=1");
+                    break;
+
+                default:
+
+                    throw new NotSupportedException($"Unsupported SSH authentication method [{hiveLogin.Definition.HiveNode.SshAuth}].");
+            }
         }
 
         /// <inheritdoc/>

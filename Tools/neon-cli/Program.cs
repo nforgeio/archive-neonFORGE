@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    Program.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -33,27 +22,48 @@ using Newtonsoft.Json;
 using Neon;
 using Neon.Common;
 using Neon.Diagnostics;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
     /// <summary>
-    /// This tool is used to configure the nodes of a cluster.
-    /// See <b>$/Doc/Ubuntu-18.04 cluster Deploy.docx</b> for more information.
+    /// This tool is used to configure the nodes of a Neon Docker Swarm hive.
+    /// See <b>$/Doc/Ubuntu-16.04 Hive Deploy.docx</b> for more information.
     /// </summary>
     public static class Program
     {
         private static DockerShim shim;     // $hack(jeff.lill): Exit() uses this to ensure that shim folders are deleted.
 
         /// <summary>
-        /// The program version.
+        /// The actual program version.  This may be different from <see cref="Version"/>
+        /// if the <b>--version=VERSION</b> option was specified to force a specific
+        /// version.
         /// </summary>
-        public const string Version = "0.1.0+1902-alpha-0";
+        public const string ActualVersion  = "18.12.0-alpha.7";
+
+        /// <summary>
+        /// Returns the <b>neon-cli</b> version.  This may be different from <see cref="ActualVersion"/>
+        /// if the <b>--version=VERSION</b> option was specified to force a specific
+        /// </summary>
+        public static string Version { get; private set; } = ActualVersion;
+
+        /// <summary>
+        /// The minimum <b>neon-cli</b> version capable of managing a hive created
+        /// or updated by the current version of the tool.  This is persisted to the
+        /// hive.  <b>neon-cli</b> checks this to ensure that it is capable of
+        /// managing a hive or if it is too old.
+        /// </summary>
+        public const string MinimumVersion = "18.12.0-alpha.7";
     
         /// <summary>
         /// CURL command common options.
         /// </summary>
         public const string CurlOptions = "-4fsSLv --retry 10 --retry-delay 30"; 
+
+        /// <summary>
+        /// Host node operating system properties or <c>null</c>.
+        /// </summary>
+        private static OSProperties osProperties;
 
         /// <summary>
         /// Program entry point.
@@ -62,7 +72,7 @@ namespace NeonCli
         public static void Main(string[] args)
         {
             string usage = $@"
-Neon Kubernetes Tool: neon [v{Program.Version}]
+Neon Hive Configuration Tool: neon [v{Program.Version}]
 {Build.Copyright}
 
 USAGE:
@@ -72,35 +82,109 @@ USAGE:
 COMMAND SUMMARY:
 
     neon help               COMMAND
-    neon cluster prepare    [CLUSTER-DEF]
-    neon cluster setup      [CLUSTER-DEF]
-    neon login              COMMAND
-    neon logout
-    neon password           COMMAND
+
+    neon ansible exec       ARGS
+    neon ansible galaxy     ARGS
+    neon ansible play       ARGS
+    neon ansible vault      ARGS
+    neon couchbase          CMD...
+    neon certificate|cert   CMD...
+    neon consul             ARGS
+    neon create cypher
+    neon create password    [--length=#]
+    neon create uuid
+    neon dashboard|dash     DASHBOARD
+    neon docker             -- CMD [ARGS]
+    neon download           SOURCE TARGET [NODE]
+    neon exec               BASH-CMD
+    neon file               create|decrypt|edit|encrypt|view PATH PASSWORD-NAME
+    neon folder             FOLDER
+    neon hive dns           ARGS
+    neon hive example
+    neon hive get           VALUE-EXPR
+    neon hive info
+    neon hive node          ARGS
+    neon hive prepare       [HIVE-DEF]
+    neon hive registry      ARGS
+    neon hive queue         CMD...
+    neon hive set           SETTING=VALUE
+    neon hive setup         [HIVE-DEF]
+    neon hive verify        [HIVE-DEF]
+    neon hive update        ARGS
+    neon login              [--no-vpn] USER@HIVE
+    neon login clean
+    neon login export       USER@HIVE
+    neon login import       PATH
+    neon login list
+    neon login ls
+    neon login remove       USER@HIVE
+    neon login rm           USER@HIVE
+    neon login status
+    neon reboot             NODE...
+    neon registry           CMD...
+    neon run                -- CMD...
     neon scp                [NODE]
     neon ssh                [NODE]
-    neon version            [-n] [--git]
+    neon traffic            CMD...
+    neon validate           HIVE-DEF
+    neon version            [-n] [-git]
+    neon upload             SOURCE TARGET [NODE...]
+    neon vault              ARGS
+    neon zip create         SOURCE ARCHIVE
+    neon zip extract        ARCHIVE FOLDER
 
 ARGUMENTS:
 
-    CLUSTER-DEF         - Path to a cluster definition file.  This is
-                          optional for some commands when logged in
-    COMMAND             - Subcommand and arguments.
-    NODE                - A node name.
+    ARGS                - Command pass-thru arguments.
+    BASH-CMD            - Bash command.
+    HIVE                - Names the hive to be selected for subsequent
+                          operations.
+    CMD...              - Subcommand and arguments.
+    DASHBOARD           - Identifies a hive dashboard
+    FOLDER              - Identifies a neonHIVE folder
+    HIVE-DEF            - Path to a hive definition file.  This is
+                          optional for some commands when logged in.
+    LOGIN-PATH          - Path to a hive login file including the hive
+                          definition and user credentials.
+    NODE                - Identifies a hive node by name.
+    VALUE-EXPR          - A hive value expression.  See the command for
+                          more details.
+    SERVER1...          - IP addresses or FQDNs of target servers
+    SOURCE              - Path to a source file.
+    TARGET              - Path to a destination file.
+    USER                - Hive user name.
 
 OPTIONS:
 
     --help                              - Display help
+    --debug                             - Set debug mode
+    --image-reg=REGISTRY                - Overrides the default Docker Hub 
+                                          registry (""nhive"" or ""nhivedev"")
+                                          for images when deploying or updating a hive
+                                          (usually for development/testing purposes)
+    --image-tag=TAG                     - Replaces any [:latest] Docker image
+                                          tags when deploying or updating a hive
+                                          (usually for development/testing purposes)
     --log-folder=LOG-FOLDER             - Optional log folder path
     -m=COUNT, --max-parallel=COUNT      - Maximum number of nodes to be 
-                                          configured in parallel [default=6]
+                                          configured in parallel [default=5]
     --machine-password=PASSWORD         - Overrides default initial machine
                                           password: sysadmin0000
     --machine-username=USERNAME         - Overrides default initial machine
                                           username: sysadmin
+    --noterminal                        - Disables the shimmed interactive terminal
+    --node=NODE                         - Some commands may be directed at
+                                          specific node(s)
     -q, --quiet                         - Disables operation progress
-    -w=SECONDS, --wait=SECONDS          - Seconds to delay for cluster stablization 
-                                          (defaults to 60s).
+    --shim                              - Run the command in Docker if possible
+    --version=VERSION                   - Overrides the neon-cli version
+    -w=SECONDS, --wait=SECONDS          - Seconds to delay for hive
+                                          stablization (defaults to 60s).
+
+NOTE:
+
+Virtual machines provisioned to cloud environments like Azure and AWS will
+use a random password if [--machine-password] isn't explicitly set.
 ";
             // Disable any logging that might be performed by library classes.
 
@@ -115,7 +199,7 @@ OPTIONS:
             // that don't actually require elevated permissions.  We may wish to relax this
             // in the future.
 
-            if (!KubeHelper.InToolContainer)
+            if (!HiveHelper.InToolContainer)
             {
                 if (NeonHelper.IsWindows)
                 {
@@ -134,7 +218,24 @@ OPTIONS:
                 }
             }
 
-            // Ensure that all of the cluster hosting manager implementations are loaded.
+            // Configure the encrypted user-specific application data folder and initialize
+            // the subfolders.
+
+            HiveRootFolder  = HiveHelper.GetHiveUserFolder();
+            HiveLoginFolder = HiveHelper.GetLoginFolder();
+            HiveSetupFolder = HiveHelper.GetVmTemplatesFolder();
+            HiveTempFolder  = HiveHelper.GetTempFolder();
+            CurrentHivePath = HiveHelper.CurrentPath;
+
+            // We're going to special case the temp folder and locate this within the [/dev/shm] 
+            // tmpfs based RAM drive if we're running in the tool container.
+
+            HiveTempFolder  = HiveHelper.InToolContainer ? "/dev/shm/temp" : HiveTempFolder;
+
+            Directory.CreateDirectory(HiveLoginFolder);
+            Directory.CreateDirectory(HiveTempFolder);
+
+            // Ensure that all of the hive hosting manager implementations are loaded.
 
             new HostingManagerFactory(() => HostingLoader.Initialize());
 
@@ -151,26 +252,30 @@ OPTIONS:
                 {
                     cmdLine.DefineOption("--machine-username");
                     cmdLine.DefineOption("--machine-password");
-                    cmdLine.DefineOption("-os").Default = "Ubuntu-18.04";
+                    cmdLine.DefineOption("-os").Default = "ubuntu-16.04";
                     cmdLine.DefineOption("-q", "--quiet");
-                    cmdLine.DefineOption("-m", "--max-parallel").Default = "6";
+                    cmdLine.DefineOption("-m", "--max-parallel").Default = "5";
                     cmdLine.DefineOption("-w", "--wait").Default = "60";
                     cmdLine.DefineOption("--log-folder").Default = string.Empty;
                 }
 
                 var validOptions = new HashSet<string>();
 
-                validOptions.Add("--debug");
-                validOptions.Add("--help");
-                validOptions.Add("--log-folder");
                 validOptions.Add("--machine-username");
                 validOptions.Add("--machine-password");
-                validOptions.Add("-m");
-                validOptions.Add("--max-parallel");
+                validOptions.Add("--log-folder");
                 validOptions.Add("-q");
                 validOptions.Add("--quiet");
+                validOptions.Add("-m");
+                validOptions.Add("--max-parallel");
                 validOptions.Add("-w");
                 validOptions.Add("--wait");
+                validOptions.Add("--image-reg");
+                validOptions.Add("--image-tag");
+                validOptions.Add("--noterminal");
+                validOptions.Add("--version");
+                validOptions.Add("--debug");
+                validOptions.Add("--shim");
 
                 if (CommandLine.Arguments.Length == 0)
                 {
@@ -180,28 +285,75 @@ OPTIONS:
 
                 var commands = new List<ICommand>()
                 {
-                    new ClusterCommand(),
-                    new ClusterPrepareCommand(),
-                    new ClusterSetupCommand(),
-                    new ClusterVerifyCommand(),
+                    new AnsibleCommand(),
+                    new CouchbaseCommand(),
+                    new CertificateCommand(),
+                    new ConsulCommand(),
+                    new CreateCommand(),
+                    new CreateCypherCommand(),
+                    new CreatePasswordCommand(),
+                    new CreateUuidCommand(),
+                    new DashboardCommand(),
+                    new DockerCommand(),
+                    new DownloadCommand(),
+                    new ExecCommand(),
+                    new FileCommand(),
+                    new FolderCommand(),
+                    new HiveCommand(),
+                    new HiveDnsCommand(),
+                    new HiveExampleCommand(),
+                    new HiveGetCommand(),
+                    new HiveInfoCommand(),
+                    new HiveNodeCommand(),
+                    new HivePrepareCommand(),
+                    new HiveRegistryCommand(),
+                    new HiveSetCommand(),
+                    new HiveSetupCommand(),
+                    new HiveUpdateCommand(),
+                    new HiveVerifyCommand(),
                     new LoginCommand(),
+                    new LoginCleanCommand(),
                     new LoginExportCommand(),
                     new LoginImportCommand(),
                     new LoginListCommand(),
                     new LoginRemoveCommand(),
+                    new LoginStatusCommand(),
                     new LogoutCommand(),
-                    new PasswordCommand(),
-                    new PasswordExportCommand(),
-                    new PasswordGenerateCommand(),
-                    new PasswordGetCommand(),
-                    new PasswordImportCommand(),
-                    new PasswordListCommand(),
-                    new PasswordRemoveCommand(),
-                    new PasswordSetCommand(),
+                    new HiveMQCommand(),
+                    new RebootCommand(),
+                    new RegistryCommand(),
+                    new RunCommand(),
                     new ScpCommand(),
                     new SshCommand(),
-                    new VersionCommand()
+                    new TrafficCommand(),
+                    new UploadCommand(),
+                    new VaultCommand(),
+                    new VersionCommand(),
+                    new VpnCommand(),
+                    new ZipCommand()
                 };
+
+                // Parse the [--version=VERSION] option.
+
+                Version = LeftCommandLine.GetOption("--version", ActualVersion);
+
+                var dashPos   = Version.IndexOf('-');
+                var versionOK = true;
+
+                if (dashPos != -1)
+                {
+                    versionOK = System.Version.TryParse(Version.Substring(0, dashPos), out var version);
+                }
+                else
+                {
+                    versionOK = System.Version.TryParse(Version, out var version);
+                }
+
+                if (!versionOK)
+                {
+                    Console.Error.WriteLine($"*** ERROR: [{Version}] is not a valid program version.");
+                    Program.Exit(1);
+                }
 
                 // Short-circuit the help command.
 
@@ -244,7 +396,7 @@ OPTIONS:
 
                 if (!string.IsNullOrEmpty(LogPath))
                 {
-                    if (KubeHelper.InToolContainer)
+                    if (HiveHelper.InToolContainer)
                     {
                         // We hardcode logging to [/log] inside [neon-cli] containers.
 
@@ -262,12 +414,11 @@ OPTIONS:
 
                 using (shim = new DockerShim(CommandLine))
                 {
-                    var secretsRoot = KubeHelper.GetNeonKubeUserFolder(ignoreNeonToolContainerVar: true);
+                    var secretsRoot = HiveHelper.GetHiveUserFolder(ignoreNeonToolContainerVar: true);
 
-                    // $todo(jeff.lill): Implement this?
-                    // HiveLogin = GetHiveLogin();
+                    HiveLogin = GetHiveLogin();
 
-                    if (!KubeHelper.InToolContainer)
+                    if (!HiveHelper.InToolContainer)
                     {
                         // Give the command a chance to modify the shimmed command line and also
                         // verify that the command can be run within Docker.
@@ -276,12 +427,18 @@ OPTIONS:
 
                         if (shimInfo.EnsureConnection)
                         {
-                            // $todo(jeff.lill): Implement this?
-                            //if (HiveLogin == null)
-                            //{
-                            //    Console.Error.WriteLine(Program.MustLoginMessage);
-                            //    Program.Exit(1);
-                            //}
+                            if (HiveLogin == null)
+                            {
+                                Console.Error.WriteLine(Program.MustLoginMessage);
+                                Program.Exit(1);
+                            }
+
+                            if (HiveLogin.ViaVpn)
+                            {
+                                HiveHelper.VpnOpen(HiveLogin,
+                                    onStatus: message => Console.Error.WriteLine(message),
+                                    onError: message => Console.Error.WriteLine($"*** ERROR: {message}"));
+                            }
                         }
 
                         // $note(jeff.lill):
@@ -319,18 +476,18 @@ OPTIONS:
 
                             shim.WriteScript();
 
-                            // Run the [nkubeio/neon-cli] Docker image, passing the modified command line 
+                            // Run the [nhive/neon-cli] Docker image, passing the modified command line 
                             // arguments and mounting the following read/write volumes:
                             //
-                            //      /neonkube       - the root folder for this workstation's cluster logins
+                            //      /neonhive       - the root folder for this workstation's hive logins
                             //      /shim           - the generated shim files
                             //      /log            - the logging folder (if logging is enabled)
                             //
                             // See: https://github.com/jefflill/NeonForge/issues/266
 
-                            var secretsMount = $"--mount type=bind,source=\"{secretsRoot}\",target=/neonkube";
-                            var shimMount    = $"--mount type=bind,source=\"{shim.ShimExternalFolder}\",target=/shim";
-                            var options      = shim.Terminal ? "-it" : "-i";
+                            var secretsMount = $"--mount type=bind,source=\"{secretsRoot}\",target=/neonhive";
+                            var shimMount = $"--mount type=bind,source=\"{shim.ShimExternalFolder}\",target=/shim";
+                            var options = shim.Terminal ? "-it" : "-i";
 
                             if (LeftCommandLine.HasOption("--noterminal"))
                             {
@@ -376,7 +533,7 @@ OPTIONS:
 
                             var imageTag = Program.Version;
 
-                            if (ThisAssembly.Git.Branch != KubeConst.GitProdBranch)
+                            if (ThisAssembly.Git.Branch != HiveConst.GitProdBranch)
                             {
                                 imageTag = $"{ThisAssembly.Git.Branch}-{Program.Version}";
                             }
@@ -392,11 +549,6 @@ OPTIONS:
                                 sbEnvOptions.AppendWithSeparator(NeonHelper.NormalizeExecArgs($"--env={envOption}"));
                             }
 
-                            // Use the [nkubeio] Docker Hub registry for PROD releases and [nhivedev]
-                            // for all other branches.
-
-                            var sourceRegistry = IsProd ? KubeConst.NeonProdRegistry : KubeConst.NeonDevRegistry;
-
                             // Verify that the matching [neon-cli] image exists in the local Docker,
                             // pulling it if it does not.  We're going to do this as an extra step
                             // to prevent the pulling messages from mixing into the command output.
@@ -406,7 +558,7 @@ OPTIONS:
                                 {
                                     "image",
                                     "ls",
-                                    "--filter", $"reference={sourceRegistry}/neon-cli:{imageTag}"
+                                    "--filter", $"reference=nhive/neon-cli:{imageTag}"
                                 });
 
                             if (result.ExitCode != 0)
@@ -418,10 +570,15 @@ $@"*** ERROR: Cannot list Docker images.
                                 Program.Exit(1);
                             }
 
+                            // Use the [nhive] Docker Hub registry for PROD releases and [nhivedev]
+                            // for all other branches.
+
+                            var sourceRegistry = IsProd ? HiveConst.NeonProdRegistry : HiveConst.NeonDevRegistry;
+
                             // The Docker image list output should look something like this:
                             //
                             //      REPOSITORY                  TAG                 IMAGE ID            CREATED             SIZE
-                            //      nkubeio/neon-registry       jeff-latest         b0d1d9c21ee1        20 hours ago        34.2MB
+                            //      nhive/neon-registry         jeff-latest         b0d1d9c21ee1        20 hours ago        34.2MB
                             //
                             // We're just going to look to see there's a line of text that specifies
                             // the repo and tag we're looking for.
@@ -454,7 +611,7 @@ $@"*** ERROR: Cannot list Docker images.
                                 if (result.ExitCode != 0)
                                 {
                                     Console.Error.WriteLine(
-$@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
+$@"*** ERROR: Cannot pull: nhive/neon-cli:{imageTag}
 
 {result.AllText}");
                                     Program.Exit(1);
@@ -528,9 +685,91 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
 
                 Debug = LeftCommandLine.HasOption("--debug");
 
+                // Parse and check any [--image-reg=REGISTRY] option.
+
+                DockerImageReg = LeftCommandLine.GetOption("--image-reg");
+
+                if (DockerImageReg != null)
+                {
+                    if (DockerImageReg.Length == 0)
+                    {
+                        Console.Error.WriteLine($"*** ERROR: [--image-reg={DockerImageReg}] cannot specify an empty registry.");
+                        Program.Exit(1);
+                    }
+
+                    if (DockerImageReg[0] == '.')
+                    {
+                        Console.Error.WriteLine($"*** ERROR: [--image-reg={DockerImageReg}] cannot start with a period (.).");
+                        Program.Exit(1);
+                    }
+
+                    foreach (var ch in DockerImageReg)
+                    {
+                        var upper = char.ToUpperInvariant(ch);
+
+                        if ('A' <= upper && upper <= 'Z')
+                        {
+                            continue;
+                        }
+                        else if ('0' <= upper && upper <= '9')
+                        {
+                            continue;
+                        }
+                        else if (ch == '_')
+                        {
+                            continue;
+                        }
+
+                        Console.Error.WriteLine($"*** ERROR: [--image-reg={DockerImageReg}] includes the invalid character [{ch}].  Only [a-zA-Z0-9_] are allowed.");
+                        Program.Exit(1);
+                    }
+                }
+
+                // Parse and check any [--image-tag=TAG] option.
+
+                DockerImageTag = LeftCommandLine.GetOption("--image-tag");
+
+                if (DockerImageTag != null)
+                {
+                    if (DockerImageTag.Length == 0)
+                    {
+                        Console.Error.WriteLine($"*** ERROR: [--image-tag={DockerImageTag}] cannot specify an empty tag.");
+                        Program.Exit(1);
+                    }
+
+                    if (DockerImageTag[0] == '.' || DockerImageTag[0] == '-')
+                    {
+                        Console.Error.WriteLine($"*** ERROR: [--image-tag={DockerImageTag}] cannot start with a period (.) or dash (-).");
+                        Program.Exit(1);
+                    }
+
+                    foreach (var ch in DockerImageTag)
+                    {
+                        var upper = char.ToUpperInvariant(ch);
+
+                        if ('A' <= upper && upper <= 'Z')
+                        {
+                            continue;
+                        }
+                        else if ('0' <= upper && upper <= '9')
+                        {
+                            continue;
+                        }
+                        else if (ch == '_' || ch == '.' || ch == '-')
+                        {
+                            continue;
+                        }
+
+                        Console.Error.WriteLine($"*** ERROR: [--image-tag={DockerImageTag}] includes the invalid character [{ch}].  Only [a-zA-Z0-9_.-] are allowed.");
+                        Program.Exit(1);
+                    }
+                }
+
                 if (command.CheckOptions)
                 {
-                    // Ensure that there are no unexpected command line options.
+                    // Make sure there are no unexpected command line options.
+
+                    validOptions.Add("--help");
 
                     foreach (var optionName in command.ExtendedOptions)
                     {
@@ -559,6 +798,10 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
                     }
                 }
 
+                // Load the current hive if there is one.
+
+                HiveLogin = GetHiveLogin();
+
                 // Run the command.
 
                 if (command.NeedsSshCredentials(CommandLine))
@@ -566,8 +809,8 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
                     if (string.IsNullOrWhiteSpace(MachineUsername) || string.IsNullOrEmpty(MachinePassword))
                     {
                         Console.WriteLine();
-                        Console.WriteLine("    Enter cluster SSH credentials:");
-                        Console.WriteLine("    -------------------------------");
+                        Console.WriteLine("    Enter hive SSH credentials:");
+                        Console.WriteLine("    ---------------------------");
                     }
 
                     while (string.IsNullOrWhiteSpace(MachineUsername))
@@ -585,7 +828,7 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
                 {
                     // $hack(jeff.lill):
                     //
-                    // Only the [neon cluster prepare ...] command recognizes the [--machine-username] and
+                    // Only the [neon hive prepare ...] command recognizes the [--machine-username] and
                     // [--machine-password] options.  These can cause problems for other commands
                     // so we're going to set both to NULL here.
                     //
@@ -619,40 +862,144 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
         }
 
         /// <summary>
-        /// Returns a <see cref="ClusterProxy"/> for the current Kubernetes context.
+        /// Message written then a user is not logged into a hive.
         /// </summary>
-        /// <returns>The <see cref="ClusterProxy"/>.</returns>
-        /// <remarks>
-        /// <note>
-        /// This method will terminate the program with an error message when not logged
-        /// into a neonKUBE cluster.
-        /// </note>
-        /// </remarks>
-        public static ClusterProxy GetCluster()
-        {
-            if (KubeHelper.CurrentContext == null)
-            {
-                Console.Error.WriteLine("*** ERROR: You are not logged into a cluster.");
-                Program.Exit(1);
-            }
-            else if (KubeHelper.CurrentContext == null)
-            {
-                Console.Error.WriteLine("*** ERROR: You are not logged into a neonKUBE cluster.");
-                Program.Exit(1);
-            }
-
-            return new ClusterProxy(KubeHelper.CurrentContext, Program.CreateNodeProxy<NodeDefinition>);
-        }
-
-        /// <summary>
-        /// Message written then a user is not logged into a cluster.
-        /// </summary>
-        public const string MustLoginMessage = "*** ERROR: You must first log into a cluster.";
+        public const string MustLoginMessage = "*** ERROR: You must first log into a hive.";
 
         /// <summary>
         /// Returns the Git source code branch.
         /// </summary>
         public static string GitBranch => ThisAssembly.Git.Branch;
+
+        /// <summary>
+        /// Optionally set to the registry to be used to override any explicit or implicit <b>nhive</b>
+        /// or <b>nhivedev</b> organizations specified when deploying or updating a neonHIVE.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This property is <c>null</c> by default but may be specified using the <b>--image-reg=REGISTRY</b>
+        /// command line option.  The main purpose of this is support development and testing scenarios.
+        /// </para>
+        /// </remarks>
+        public static string DockerImageReg { get; private set; } = null;
+
+        /// <summary>
+        /// Optionally set to the tag to be used to override any explicit or implicit <b>:latest</b>
+        /// image tags specified when deploying or updating a neonHIVE.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// This property is <c>null</c> by default but may be specified using the <b>--image-tag=TAG</b>
+        /// command line option.  The main purpose of this is support development and testing by specifying
+        /// something like <b>--image-tag=BRANCH-latest</b>, where <b>BRANCH</b> is the current development
+        /// branch.
+        /// </para>
+        /// <para>
+        /// This will direct <b>neon-cli</b> to use images built from the branch rather than the default
+        /// production images without needing to modify hive configuration files.  All the developer
+        /// needs to do is ensure that all of the required images were built from that branch first and
+        /// then published to Docker Hub.
+        /// </para>
+        /// </remarks>
+        public static string DockerImageTag { get; private set; } = null;
+
+        /// <summary>
+        /// Resolves a Docker Image name/tag into the image specification to be actually deployed, taking
+        /// the <see cref="DockerImageReg"/> and <see cref="DockerImageTag"/> properties into account.
+        /// </summary>
+        /// <param name="image">The input image specification.</param>
+        /// <returns>The output specification.</returns>
+        /// <remarks>
+        /// <para>
+        /// If <see cref="DockerImageReg"/> is empty and <paramref name="image"/> specifies the 
+        /// <see cref="HiveConst.NeonProdRegistry"/> and the Git branch used to build <b>neon-cli</b>
+        /// is not <b>PROD</b>, then the image registry will be set to <see cref="HiveConst.NeonDevRegistry"/>.
+        /// This ensures that non-production <b>neon-cli </b> builds will use the development Docker
+        /// images by default.
+        /// </para>
+        /// <para>
+        /// If <see cref="DockerImageReg"/> is not empty  and <paramref name="image"/> specifies the 
+        /// <see cref="HiveConst.NeonProdRegistry"/> then <see cref="DockerImageReg"/> will
+        /// replace the registry in the image.
+        /// </para>
+        /// <para>
+        /// If <see cref="DockerImageTag"/> is empty, then this method simply returns the <paramref name="image"/>
+        /// argument as passed.  Otherwise, if the image argument implicitly or explicitly specifies the 
+        /// <b>:latest</b> tag, then the image returned will be tagged with <see cref="DockerImageTag"/>
+        /// when that's not empty or <b>:latest</b> for the <b>PROD</b> branch or <b>:BRANCH-latest</b> 
+        /// for non-<b>PROD</b> branches.
+        /// </para>
+        /// <para>
+        /// In all cases where <paramref name="image"/> specifies a non-latest tag, then the argument
+        /// will be returned unchanged.
+        /// </para>
+        /// </remarks>
+        public static string ResolveDockerImage(string image)
+        {
+            if (string.IsNullOrEmpty(image))
+            {
+                return image;
+            }
+
+            // Extract the registry from the image.  Note that this will
+            // be empty for official images on Docker Hub.
+
+            var registry = (string)null;
+            var p        = image.IndexOf('/');
+
+            if (p != -1)
+            {
+                registry = image.Substring(0, p);
+            }
+
+            if (!string.IsNullOrEmpty(registry) && registry == HiveConst.NeonProdRegistry)
+            {
+                var imageWithoutRegistry = image.Substring(registry.Length);
+
+                if (!string.IsNullOrEmpty(DockerImageReg))
+                {
+                    image = DockerImageReg + imageWithoutRegistry;
+                }
+                else if (!IsProd)
+                {
+                    image = HiveConst.NeonDevRegistry + imageWithoutRegistry;
+                }
+            }
+
+            if (string.IsNullOrEmpty(image))
+            {
+                return image;
+            }
+
+            var normalized = image;
+
+            if (normalized.IndexOf(':') == -1)
+            {
+                // The image implicitly specifies [:latest].
+
+                normalized += ":latest";
+            }
+
+            if (normalized.EndsWith(":latest"))
+            {
+                if (!string.IsNullOrEmpty(DockerImageTag))
+                {
+                    return normalized.Replace(":latest", $":{DockerImageTag}");
+                }
+                else if (IsProd)
+                {
+                    return normalized;
+                }
+                else
+                {
+                    return normalized.Replace(":latest", $":{ThisAssembly.Git.Branch.ToLowerInvariant()}-latest");
+                }
+            }
+            else
+            {
+                return image;
+            }
+        }
 
         /// <summary>
         /// Path to the WinSCP program executable.
@@ -772,15 +1119,20 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
             {
                 // $hack(jeff.lill):
                 //
-                // Calling Exit() short circuits the using statement in the [Main]
-                // method above so we're going to dispose the shim here instead 
-                // (if there is one).  I had accumulated almost 38K shim folders 
-                // over the past six months or so.  This should help prevent that.
+                // Calling Exit() short circuits the using statement above so we're
+                // going to dispose the shim here instead (if there is one).  I had
+                // accumulated almost 38K shim folders over the past siz months or so.
+                // This should help prevent that.
                 //
                 //      https://github.com/jefflill/NeonForge/issues/394
 
                 shim.Dispose();
                 shim = null;
+            }
+
+            if (HiveHelper.IsConnected)
+            {
+                HiveHelper.CloseHive();
             }
 
             Environment.Exit(exitCode);
@@ -798,22 +1150,209 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
         public static CommandLine LeftCommandLine { get; private set; }
 
         /// <summary>
+        /// Returns the command line as a string with sensitive information like a password
+        /// are redacted.  This is suitable for using as a <see cref="SetupController{NodeMetadata}"/>'s
+        /// operation summary.
+        /// </summary>
+        public static string SafeCommandLine
+        {
+            get
+            {
+                // Special case the situation when the tool is running in a Docker container
+                // and a special file is present with the original command line presented
+                // to the shim.
+
+                if (File.Exists("__shim.org"))
+                {
+                    return File.ReadAllText("__shim.org").Trim();
+                }
+
+                // Obscure the [--machine-password=xxxx] option.
+
+                var sb = new StringBuilder();
+
+                foreach (var item in CommandLine.Items)
+                {
+                    if (item.StartsWith("--machine-password"))
+                    {
+                        sb.AppendWithSeparator("--machine-password=[REDACTED]");
+                    }
+                    else
+                    {
+                        sb.AppendWithSeparator(item);
+                    }
+                }
+
+                return sb.ToString();
+            }
+        }
+
+        /// <summary>
+        /// The host node operating system information.
+        /// </summary>
+        public static OSProperties OSProperties
+        {
+            get
+            {
+                if (osProperties != null)
+                {
+                    return osProperties;
+                }
+                else if (HiveHelper.Hive != null)
+                {
+                    return OSProperties.For(HiveHelper.Hive.Definition.HiveNode.OperatingSystem);
+                }
+                else
+                {
+                    throw new InvalidOperationException($"[{nameof(Program)}.{nameof(OSProperties)}] property is not set.");
+                }
+            }
+
+            set { osProperties = value; }
+        }
+
+        /// <summary>
         /// Returns <c>true</c> if the program was built from the production <b>PROD</b> 
         /// source code branch.
         /// </summary>
         public static bool IsProd => ThisAssembly.Git.Branch.Equals("prod", StringComparison.InvariantCultureIgnoreCase);
 
         /// <summary>
-        /// Returns the username used to secure the cluster nodes before they are setup.  This
-        /// defaults to <b>sysadmin</b> which is used for the cluster machine templates.
+        /// Returns the folder where <b>neon-cli</b> persists local state.  This
+        /// folder and all subfolders are encrypted when supported by the current
+        /// operating system.
+        /// </summary>
+        public static string HiveRootFolder { get; private set; }
+
+        /// <summary>
+        /// Returns the folder where <b>neon-cli</b> persists hive login information.
+        /// </summary>
+        public static string HiveLoginFolder { get; private set; }
+
+        /// <summary>
+        /// Returns the path to the file where the name of the current hive is saved.
+        /// </summary>
+        public static string CurrentHivePath { get; private set; }
+
+        /// <summary>
+        /// Returns the path to the (hopefully) encrypted or tmpfs based temporary folder.
+        /// </summary>
+        public static string HiveTempFolder { get; private set; }
+
+        /// <summary>
+        /// Returns the path to the hive setup folder.
+        /// </summary>
+        public static string HiveSetupFolder { get; private set; }
+
+        /// <summary>
+        /// Returns the path to the hive temp folder.
+        /// </summary>
+        public static string HiveTemppFolder { get; private set; }
+
+        /// <summary>
+        /// Returns the path to the login information for the named hive.
+        /// </summary>
+        /// <param name="username">The operator's user name.</param>
+        /// <param name="hiveName">The hive name.</param>
+        /// <returns>The path to the hive's credentials file.</returns>
+        public static string GetHiveLoginPath(string username, string hiveName)
+        {
+            Covenant.Requires<ArgumentNullException>(!string.IsNullOrEmpty(hiveName));
+            Covenant.Requires<ArgumentNullException>(!string.IsNullOrEmpty(username));
+
+            return Path.Combine(HiveLoginFolder, $"{username}@{hiveName}.login.json");
+        }
+
+        /// <summary>
+        /// Returns the hive login information for the currently logged in hive.
+        /// The method also ensures that the current <b>neon-cli</b> satisfies the
+        /// hive's  minimum version requirement when logged in.
+        /// </summary>
+        /// <param name="isRequired">Optionally ensures that a current login is required (defaults to <c>false</c>).</param>
+        /// <returns>The current hive login or <c>null</c>.</returns>
+        public static HiveLogin GetHiveLogin(bool isRequired = false)
+        {
+            HiveLogin hiveLogin;
+
+            try
+            {
+                hiveLogin = HiveHelper.GetLogin(!isRequired, Program.Version);
+            }
+            catch (VersionException e)
+            {
+                Console.Error.WriteLine($"*** ERROR: {e.Message}");
+                Program.Exit(1);
+                return null;
+            }
+
+            if (isRequired && hiveLogin == null)
+            {
+                Console.Error.WriteLine(Program.MustLoginMessage);
+                Program.Exit(1);
+            }
+
+            Program.HiveLogin = hiveLogin;
+
+            return hiveLogin;
+        }
+
+        /// <summary>
+        /// Uses <see cref="HiveHelper.OpenHiveRemote(DebugSecrets, DebugConfigs, string, bool)"/> to 
+        /// ensure that there's a currently logged-in hive and that the VPN connection
+        /// is established if required.
+        /// </summary>
+        /// <param name="allowPreparedOnly">Optionally allows partially initialized hive logins (defaults to <c>false</c>).</param>
+        /// <returns>The current hive login or <c>null</c>.</returns>
+        /// <remarks>
+        /// Nearly all commands required a fully initialized hive login.  The only exception
+        /// at this time it the <b>neon hive setup</b> command which can accept a login
+        /// created by the <b>neon hive prepare</b> command that generates a login that
+        /// has been initialized enough to allow setup to connect to the hive via a VPN
+        /// if necessary, has the host root account credentials, and also includes the
+        /// hive definition.  Partially intializated logins will have <see cref="HiveLogin.SetupPending"/>
+        /// set to <c>true</c>.
+        /// </remarks>
+        public static HiveLogin ConnectHive(bool allowPreparedOnly = false)
+        {
+            var hiveLogin = Program.GetHiveLogin(isRequired: true);
+
+            if (hiveLogin.SetupPending && !allowPreparedOnly)
+            {
+                throw new Exception($"Hive login [{hiveLogin.LoginName}] does not reference a fully configured hive.  Use the [neon hive setup...] command to complete hive configuration.");
+            }
+
+            HiveHelper.OpenHiveRemote(loginPath: HiveHelper.GetLoginPath(HiveConst.RootUser, Program.HiveLogin.HiveName));
+
+            // Note that we never try to connect the VPN from within the
+            // [neon-cli] container.  Its expected that the VPN is always
+            // established on the operator's workstation.
+
+            if (!HiveHelper.InToolContainer && hiveLogin.ViaVpn)
+            {
+                HiveHelper.VpnOpen(hiveLogin,
+                    onStatus: message => Console.Error.WriteLine(message),
+                    onError: message => Console.Error.WriteLine($"*** ERROR: {message}"));
+            }
+
+            return hiveLogin;
+        }
+
+        /// <summary>
+        /// Returns the username used to secure the hive nodes before they are setup.  This
+        /// defaults to <b>sysadmin</b> which is used for the neonHIVE machine templates.
         /// </summary>
         public static string MachineUsername { get; set; }
 
         /// <summary>
-        /// The password used to secure the cluster nodes before they are setup.  This defaults
-        /// to <b>sysadmin0000</b> which is used for the cluster machine templates.
+        /// The password used to secure the hive nodes before they are setup.  This defaults
+        /// to <b>sysadmin0000</b> which is used for the neonHIVE machine templates.
         /// </summary>
         public static string MachinePassword { get; set; }
+
+        /// <summary>
+        /// Returns the hive login information for the currently logged in hive or <c>null</c>.
+        /// </summary>
+        public static HiveLogin HiveLogin { get; set; }
 
         /// <summary>
         /// Returns the log folder path or a <c>null</c> or empty string 
@@ -827,7 +1366,7 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
         public static int MaxParallel { get; set; }
 
         /// <summary>
-        /// The seconds to wait after operations that may need a stablization period.
+        /// The seconds to wait for hive stablization.
         /// </summary>
         public static double WaitSeconds { get; set; }
 
@@ -849,13 +1388,13 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
         /// <param name="name">The node name.</param>
         /// <param name="publicAddress">The node's public IP address or FQDN.</param>
         /// <param name="privateAddress">The node's private IP address.</param>
-        /// <param name="appendToLog">
+        /// <param name="append">
         /// Pass <c>true</c> to append to an existing log file (or create one if necessary)
         /// or <c>false</c> to replace any existing log file with a new one.
         /// </param>
-        /// <typeparam name="TMetadata">Defines the metadata type the command wishes to associate with the server.</typeparam>
+        /// <typeparam name="TMetadata">Defines the metadata type the command wishes to associate with the sewrver.</typeparam>
         /// <returns>The <see cref="SshProxy{TMetadata}"/>.</returns>
-        public static SshProxy<TMetadata> CreateNodeProxy<TMetadata>(string name, string publicAddress, IPAddress privateAddress, bool appendToLog)
+        public static SshProxy<TMetadata> CreateNodeProxy<TMetadata>(string name, string publicAddress, IPAddress privateAddress, bool append)
             where TMetadata : class
         {
             Covenant.Requires<ArgumentNullException>(!string.IsNullOrEmpty(name));
@@ -866,7 +1405,7 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
             {
                 var path = Path.Combine(LogPath, name + ".log");
 
-                logWriter = new StreamWriter(new FileStream(path, appendToLog ? FileMode.Append : FileMode.Create, appendToLog ? FileAccess.Write : FileAccess.ReadWrite));
+                logWriter = new StreamWriter(new FileStream(path, append ? FileMode.Append : FileMode.Create, append ? FileAccess.Write : FileAccess.ReadWrite));
             }
 
             SshCredentials sshCredentials;
@@ -875,9 +1414,9 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
             {
                 sshCredentials = SshCredentials.FromUserPassword(Program.MachineUsername, Program.MachinePassword);
             }
-            else if (KubeHelper.CurrentContext != null)
+            else if (Program.HiveLogin != null)
             {
-                sshCredentials = KubeHelper.CurrentContext.Extensions.SshCredentials;
+                sshCredentials = Program.HiveLogin.GetSshCredentials();
             }
             else
             {
@@ -887,13 +1426,53 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
                 return null;
             }
 
-            return new SshProxy<TMetadata>(name, publicAddress, privateAddress, sshCredentials, logWriter);
+            var proxy = new SshProxy<TMetadata>(name, publicAddress, privateAddress, sshCredentials, logWriter);
+
+            proxy.RemotePath += $":{HiveHostFolders.Setup}";
+            proxy.RemotePath += $":{HiveHostFolders.Tools}";
+
+            return proxy;
         }
 
         /// <summary>
         /// Returns the folder holding the Linux resource files for the target operating system.
         /// </summary>
-        public static ResourceFiles.Folder LinuxFolder => ResourceFiles.Root.GetFolder("Ubuntu-18.04");
+        public static ResourceFiles.Folder LinuxFolder
+        {
+            get
+            {
+                switch (Program.OSProperties.TargetOS)
+                {
+                    case TargetOS.Ubuntu_16_04:
+
+                        return ResourceFiles.Root.GetFolder("Ubuntu-16.04");
+
+                    default:
+
+                        throw new NotImplementedException($"Unexpected [{Program.OSProperties.TargetOS}] target operating system.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Identifies the service manager present on the target Linux distribution.
+        /// </summary>
+        public static ServiceManager ServiceManager
+        {
+            get
+            {
+                switch (Program.OSProperties.TargetOS)
+                {
+                    case TargetOS.Ubuntu_16_04:
+
+                        return ServiceManager.Systemd;
+
+                    default:
+
+                        throw new NotImplementedException($"Unexpected [{Program.OSProperties.TargetOS}] target operating system.");
+                }
+            }
+        }
 
         /// <summary>
         /// Presents the user with a yes/no question and waits for a response.
@@ -902,30 +1481,22 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
         /// <returns><c>true</c> if the answer is yes, <b>false</b> for no.</returns>
         public static bool PromptYesNo(string prompt)
         {
-            try
+            while (true)
             {
-                while (true)
-                {
-                    Console.WriteLine();
-                    Console.Write($"{prompt} [y/n]: ");
+                Console.Write($"{prompt} [y/n]: ");
 
-                    var key = Console.ReadKey().KeyChar;
+                var key = Console.ReadKey().KeyChar;
 
-                    Console.WriteLine();
-
-                    if (key == 'y' || key == 'Y')
-                    {
-                        return true;
-                    }
-                    else if (key == 'n' || key == 'N')
-                    {
-                        return false;
-                    }
-                }
-            }
-            finally
-            {
                 Console.WriteLine();
+
+                if (key == 'y' || key == 'Y')
+                {
+                    return true;
+                }
+                else if (key == 'n' || key == 'N')
+                {
+                    return false;
+                }
             }
         }
 
@@ -933,12 +1504,12 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
         /// Uses WinSCP to convert an OpenSSH PEM formatted key to the PPK format
         /// required by PuTTY/WinSCP.  This works only on Windows.
         /// </summary>
-        /// <param name="kubeLogin">The related cluster login information.</param>
+        /// <param name="hive">The related hive login information.</param>
         /// <param name="pemKey">The OpenSSH PEM key.</param>
         /// <returns>The converted PPPK key.</returns>
         /// <exception cref="NotImplementedException">Thrown when not running on Windows.</exception>
         /// <exception cref="Win32Exception">Thrown if WinSCP could not be executed.</exception>
-        public static string ConvertPUBtoPPK(KubeContextExtension kubeLogin, string pemKey)
+        public static string ConvertPUBtoPPK(HiveLogin hive, string pemKey)
         {
             if (!NeonHelper.IsWindows)
             {
@@ -946,14 +1517,14 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
             }
 
             var programPath = "winscp.com";
-            var pemKeyPath  = Path.Combine(KubeHelper.TempFolder, Guid.NewGuid().ToString("D"));
-            var ppkKeyPath  = Path.Combine(KubeHelper.TempFolder, Guid.NewGuid().ToString("D"));
+            var pemKeyPath  = Path.Combine(Program.HiveTempFolder, Guid.NewGuid().ToString("D"));
+            var ppkKeyPath  = Path.Combine(Program.HiveTempFolder, Guid.NewGuid().ToString("D"));
 
             try
             {
                 File.WriteAllText(pemKeyPath, pemKey);
 
-                var result = NeonHelper.ExecuteCapture(programPath, $@"/keygen ""{pemKeyPath}"" /comment=""{kubeLogin.ClusterDefinition.Name} Key"" /output=""{ppkKeyPath}""");
+                var result = NeonHelper.ExecuteCapture(programPath, $@"/keygen ""{pemKeyPath}"" /comment=""{hive.Definition.Name} Key"" /output=""{ppkKeyPath}""");
 
                 if (result.ExitCode != 0)
                 {
@@ -1066,7 +1637,7 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
                 }
             }
 
-            if (!KubeHelper.InToolContainer)
+            if (!HiveHelper.InToolContainer)
             {
                 if (NeonHelper.IsWindows)
                 {
@@ -1082,136 +1653,6 @@ $@"*** ERROR: Cannot pull: {sourceRegistry}/neon-cli:{imageTag}
                 {
                     // $todo(jeff.lill): Implement this
                 }
-            }
-        }
-
-        /// <summary>
-        /// Optionally set to the registry to be used to override any explicit or implicit <b>nkubeio</b>
-        /// or <b>nkubedev</b> organizations specified when deploying or updating a neonKUBE.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This property is <c>null</c> by default but may be specified using the <b>--image-reg=REGISTRY</b>
-        /// command line option.  The main purpose of this is support development and testing scenarios.
-        /// </para>
-        /// </remarks>
-        public static string DockerImageReg { get; private set; } = null;
-
-        /// <summary>
-        /// Optionally set to the tag to be used to override any explicit or implicit <b>:latest</b>
-        /// image tags specified when deploying or updating a neonKUBE.
-        /// </summary>
-        /// <remarks>
-        /// <para>
-        /// This property is <c>null</c> by default but may be specified using the <b>--image-tag=TAG</b>
-        /// command line option.  The main purpose of this is support development and testing by specifying
-        /// something like <b>--image-tag=BRANCH-latest</b>, where <b>BRANCH</b> is the current development
-        /// branch.
-        /// </para>
-        /// <para>
-        /// This will direct <b>neon-cli</b> to use images built from the branch rather than the default
-        /// production images without needing to modify cluster configuration files.  All the developer
-        /// needs to do is ensure that all of the required images were built from that branch first and
-        /// then published to Docker Hub.
-        /// </para>
-        /// </remarks>
-        public static string DockerImageTag { get; private set; } = null;
-
-        /// <summary>
-        /// Resolves a Docker Image name/tag into the image specification to be actually deployed, taking
-        /// the <see cref="DockerImageReg"/> and <see cref="DockerImageTag"/> properties into account.
-        /// </summary>
-        /// <param name="image">The input image specification.</param>
-        /// <returns>The output specification.</returns>
-        /// <remarks>
-        /// <para>
-        /// If <see cref="DockerImageReg"/> is empty and <paramref name="image"/> specifies the 
-        /// <see cref="KubeConst.NeonProdRegistry"/> and the Git branch used to build <b>neon-cli</b>
-        /// is not <b>PROD</b>, then the image registry will be set to <see cref="KubeConst.NeonDevRegistry"/>.
-        /// This ensures that non-production <b>neon-cli </b> builds will use the development Docker
-        /// images by default.
-        /// </para>
-        /// <para>
-        /// If <see cref="DockerImageReg"/> is not empty  and <paramref name="image"/> specifies the 
-        /// <see cref="KubeConst.NeonProdRegistry"/> then <see cref="DockerImageReg"/> will
-        /// replace the registry in the image.
-        /// </para>
-        /// <para>
-        /// If <see cref="DockerImageTag"/> is empty, then this method simply returns the <paramref name="image"/>
-        /// argument as passed.  Otherwise, if the image argument implicitly or explicitly specifies the 
-        /// <b>:latest</b> tag, then the image returned will be tagged with <see cref="DockerImageTag"/>
-        /// when that's not empty or <b>:latest</b> for the <b>PROD</b> branch or <b>:BRANCH-latest</b> 
-        /// for non-<b>PROD</b> branches.
-        /// </para>
-        /// <para>
-        /// In all cases where <paramref name="image"/> specifies a non-latest tag, then the argument
-        /// will be returned unchanged.
-        /// </para>
-        /// </remarks>
-        public static string ResolveDockerImage(string image)
-        {
-            if (string.IsNullOrEmpty(image))
-            {
-                return image;
-            }
-
-            // Extract the registry from the image.  Note that this will
-            // be empty for official images on Docker Hub.
-
-            var registry = (string)null;
-            var p        = image.IndexOf('/');
-
-            if (p != -1)
-            {
-                registry = image.Substring(0, p);
-            }
-
-            if (!string.IsNullOrEmpty(registry) && registry == KubeConst.NeonProdRegistry)
-            {
-                var imageWithoutRegistry = image.Substring(registry.Length);
-
-                if (!string.IsNullOrEmpty(DockerImageReg))
-                {
-                    image = DockerImageReg + imageWithoutRegistry;
-                }
-                else if (!IsProd)
-                {
-                    image = KubeConst.NeonDevRegistry + imageWithoutRegistry;
-                }
-            }
-
-            if (string.IsNullOrEmpty(image))
-            {
-                return image;
-            }
-
-            var normalized = image;
-
-            if (normalized.IndexOf(':') == -1)
-            {
-                // The image implicitly specifies [:latest].
-
-                normalized += ":latest";
-            }
-
-            if (normalized.EndsWith(":latest"))
-            {
-                if (!string.IsNullOrEmpty(DockerImageTag))
-                {
-                    return normalized.Replace(":latest", $":{DockerImageTag}");
-                }
-                else if (IsProd)
-                {
-                    return normalized;
-                }
-                else
-                {
-                    return normalized.Replace(":latest", $":{ThisAssembly.Git.Branch.ToLowerInvariant()}-latest");
-                }
-            }
-            else
-            {
-                return image;
             }
         }
     }

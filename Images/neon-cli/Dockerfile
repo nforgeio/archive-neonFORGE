@@ -1,19 +1,8 @@
 #------------------------------------------------------------------------------
 # FILE:         Dockerfile
 # CONTRIBUTOR:  Jeff Lill
-# COPYRIGHT:    Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
+# COPYRIGHT:    Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-
 # .NET Core based image that implements the [neon-cli].
 #
 # ARGUMENTS:
@@ -34,6 +23,33 @@ ARG         APPNAME
 
 ENV NEON_TOOL_CONTAINER=1
 
+# We're going to configure NANO as the default editor used by Ansible Vault
+# to edit encrypted files.  We're also going to install VIM/VI as an option.
+
+ENV EDITOR=/bin/nano
+
+RUN apt-get update \
+    && apt-get install -yq nano vim zip \
+    && apt-get clean -yq
+
+# Install OpenVPN in it's own layer.
+
+RUN apt-get update \
+    && apt-get install -yq openvpn \
+    && apt-get clean -yq
+
+# [neon-cli] implements commands that integrate Ansible and since Ansible
+# only runs on Linux, we're going to integrate it into this image.
+#
+#   http://docs.ansible.com/ansible/latest/intro_installation.html#latest-releases-via-apt-ubuntu
+
+RUN apt-get update \
+    && apt-get install -yq software-properties-common \
+    && apt-add-repository ppa:ansible/ansible \
+    && apt-get update \
+    && apt-get install -yq ansible \
+    && apt-get clean -yq
+
 # Add the application files in two layers.  The first will contain the dependencies
 # and the second will contain the application files.  This should result in more
 # efficient images because dependencies tend to be more stable than application files.
@@ -53,6 +69,13 @@ RUN echo ** NEW LAYER **
 COPY bin/__app              /usr/bin/$APPNAME.dotnet/
 COPY docker-entrypoint.sh   /
 COPY conf/ssh_config.conf   /etc/ssh/ssh_config
+COPY modules/*              /usr/share/ansible/plugins/modules/
+
+# External Ansible modules.  Both of these have pull requests pending to
+# have them built-in to Ansible.
+#
+# https://github.com/dariko/ansible-module-docker_stack
+# https://github.com/dariko/ansible/tree/ansible-modules-core/pull/5547/lib/ansible/modules/cloud/docker
 
 # The Docker 
 
@@ -60,6 +83,7 @@ RUN chmod 700 /docker-entrypoint.sh \
     && chmod 666 /etc/ssh/ssh_config \
     && echo "#!/bin/bash" > /usr/bin/$APPNAME \ 
     && echo "exec dotnet /usr/bin/$APPNAME.dotnet/$APPNAME.dll \"\$@\"" >> /usr/bin/$APPNAME \
-    && chmod 770 /usr/bin/$APPNAME
+    && chmod 770 /usr/bin/$APPNAME \
+    && chmod 770 /usr/share/ansible/plugins/modules/*
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

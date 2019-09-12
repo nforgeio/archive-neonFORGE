@@ -1,7 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    Test_Hive.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -12,7 +12,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 using Neon.Xunit;
 using Neon.Xunit.Hive;
 
@@ -37,7 +37,7 @@ namespace TestSamples
     public class Test_Hive : IClassFixture<HiveFixture>
     {
         private HiveFixture     hiveFixture;
-        private ClusterProxy       hive;
+        private HiveProxy       hive;
         private HostsFixture    hosts;
 
         public Test_Hive(HiveFixture fixture)

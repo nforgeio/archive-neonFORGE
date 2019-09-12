@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    ServiceDetails.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -43,7 +32,6 @@ namespace Neon.Docker
         /// The service ID.
         /// </summary>
         [JsonProperty(PropertyName = "ID", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.Populate)]
-        [YamlMember(Alias = "ID", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public string ID { get; set; }
 
@@ -51,7 +39,6 @@ namespace Neon.Docker
         /// Service update version information.
         /// </summary>
         [JsonProperty(PropertyName = "Version", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.Populate)]
-        [YamlMember(Alias = "Version", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public ServiceVersion Version { get; set; }
 
@@ -59,7 +46,6 @@ namespace Neon.Docker
         /// Time when the service was created (as a string).
         /// </summary>
         [JsonProperty(PropertyName = "CreatedAt", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.Populate)]
-        [YamlMember(Alias = "CreatedAt", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public string CreatedAt { get; set; }
 
@@ -77,7 +63,6 @@ namespace Neon.Docker
         /// Time when the service was last created or updated (as a string).
         /// </summary>
         [JsonProperty(PropertyName = "UpdatedAt", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.Populate)]
-        [YamlMember(Alias = "UpdatedAt", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public string UpdatedAt { get; set; }
 
@@ -95,7 +80,6 @@ namespace Neon.Docker
         /// The service specification.
         /// </summary>
         [JsonProperty(PropertyName = "Spec", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.Populate)]
-        [YamlMember(Alias = "Spec", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public ServiceSpec Spec { get; set; }
 
@@ -105,7 +89,6 @@ namespace Neon.Docker
         /// back.
         /// </summary>
         [JsonProperty(PropertyName = "PreviousSpec", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.Populate)]
-        [YamlMember(Alias = "PreviousSpec", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public ServiceSpec PreviousSpec { get; set; }
 
@@ -113,7 +96,6 @@ namespace Neon.Docker
         /// Describes the service's current endpoint state.
         /// </summary>
         [JsonProperty(PropertyName = "Endpoint", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.Populate)]
-        [YamlMember(Alias = "Endpoint", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public ServiceEndpoint Endpoint { get; set; }
 
@@ -121,7 +103,6 @@ namespace Neon.Docker
         /// Describes the service update status.
         /// </summary>
         [JsonProperty(PropertyName = "UpdateStatus", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.Populate)]
-        [YamlMember(Alias = "UpdateStatus", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public ServiceUpdateStatus UpdateStatus { get; set; }
 

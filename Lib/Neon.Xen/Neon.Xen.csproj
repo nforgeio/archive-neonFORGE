@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <Version>7.0.0-preview.0</Version>
+    <Authors>Jeff Lill</Authors>
+    <Company>neonFORGE, LLC</Company>
+    <Product>neonHIVE</Product>
+    <Description>XenServer provisioning.</Description>
+    <Copyright>Copyright © 2016-2018 by neonFORGE LLC.  All rights reserved.</Copyright>
+    <PackageReleaseNotes>* NO CHANGES</PackageReleaseNotes>
+    <AssemblyVersion>0.0.0.0</AssemblyVersion>
+    <FileVersion>0.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>DEBUG;TRACE;NETSTANDARD2_0</DefineConstants>
+    <DocumentationFile>bin\Debug\Neon.Xen.xml</DocumentationFile>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DefineConstants>TRACE;NETSTANDARD2_0</DefineConstants>
+    <DocumentationFile>bin\Release\Neon.Xen.xml</DocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Neon.Common\Neon.Common.csproj" />
+    <ProjectReference Include="..\Neon.Hive\Neon.Hive.csproj" />
+  </ItemGroup>
+
+</Project>

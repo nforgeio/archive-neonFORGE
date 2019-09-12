@@ -1,19 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    TlsCertificate.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -625,7 +613,6 @@ subjectAltName         = @alt_names
         /// The public certificate as PEM encoded text.
         /// </summary>
         [JsonProperty(PropertyName = "CertPem", Required = Required.Always | Required.DisallowNull)]
-        [YamlMember(Alias = "CertPem", ApplyNamingConventions = false)]
         public string CertPem { get; set; }
 
         /// <summary>
@@ -652,7 +639,6 @@ subjectAltName         = @alt_names
         /// The private key as PEM encoded text.
         /// </summary>
         [JsonProperty(PropertyName = "KeyPem", Required = Required.Always | Required.DisallowNull)]
-        [YamlMember(Alias = "KeyPem", ApplyNamingConventions = false)]
         public string KeyPem { get; set; }
 
         /// <summary>
@@ -717,14 +703,12 @@ subjectAltName         = @alt_names
         /// </note>
         /// </summary>
         [JsonProperty(PropertyName = "FriendlyName", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "FriendlyName", ApplyNamingConventions = false)]
         public string FriendlyName { get; set; }
 
         /// <summary>
         /// The date when the certificate becomes valid (or <c>null</c>).
         /// </summary>
         [JsonProperty(PropertyName = "ValidFrom", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "ValidFrom", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public DateTime? ValidFrom { get; set; }
 
@@ -732,7 +716,6 @@ subjectAltName         = @alt_names
         /// The date when the certificate expires (or <c>null</c>).
         /// </summary>
         [JsonProperty(PropertyName = "ValidUntil", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "ValidUntil", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public DateTime? ValidUntil { get; set; }
 
@@ -743,7 +726,6 @@ subjectAltName         = @alt_names
         /// <c>null</c> or empty if the hostname(s) are unknown.
         /// </summary>
         [JsonProperty(PropertyName = "Hosts", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "Hosts", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public List<string> Hosts { get; set; } = new List<string>();
 
@@ -751,7 +733,6 @@ subjectAltName         = @alt_names
         /// The certificate thumbprint.
         /// </summary>
         [JsonProperty(PropertyName = "Thumbprint", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "Thumbprint", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public string Thumbprint { get; set; }
 

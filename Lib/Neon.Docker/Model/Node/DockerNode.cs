@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    DockerNode.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -30,7 +19,7 @@ using Neon.Common;
 namespace Neon.Docker
 {
     /// <summary>
-    /// Describes a cluster node.
+    /// Describes a Docker hive node.
     /// </summary>
     public class DockerNode
     {
@@ -100,7 +89,7 @@ namespace Neon.Docker
         public DateTimeOffset UpdatedAt { get; private set; }
 
         /// <summary>
-        /// Returns the node role (currently one of <b>"master"</b> or <b>"worker"</b>).
+        /// Returns the node role (currently one of <b>"manager"</b> or <b>"worker"</b>).
         /// </summary>
         public string Role { get; private set; }
 
@@ -155,7 +144,7 @@ namespace Neon.Docker
         public string Addr { get; private set; }
 
         /// <summary>
-        /// Returns management status for cluster master nodes.
+        /// Returns management status for manager nodes.
         /// </summary>
         public DockerNodeManagerStatus ManagerStatus { get; private set; }
     }

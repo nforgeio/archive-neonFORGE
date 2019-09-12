@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    LoginExportCommand.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -28,7 +17,7 @@ using Newtonsoft;
 using Newtonsoft.Json;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
@@ -38,23 +27,15 @@ namespace NeonCli
     public class LoginExportCommand : CommandBase
     {
         private const string usage = @"
-Exports an extended Kubernetes context to standard output.
+Exports a hive login to the current directory.
 
 USAGE:
 
-    neon login export [ USER@CLUSTER[/NAMESPACE] ]
+    neon login export USER@HIVE
 
 ARGUMENTS:
 
-    USER@CLUSTER[/NAMESPACE]    - Kubernetes user, cluster and optional namespace
-
-REMARKS:
-
-    The output includes the Kubernetes context information along
-    with additional neonKUBE extensions.  This is intended to be
-    used for distributing a context to other cluster operators
-    who can use the [neon login import] command to add the context
-    to their workstation.
+    USER@HIVE       - Specifies a hive login username and hive.
 ";
 
         /// <inheritdoc/>
@@ -72,52 +53,37 @@ REMARKS:
         /// <inheritdoc/>
         public override void Run(CommandLine commandLine)
         {
-            KubeContextName contextName = null;
-
-            var rawName = commandLine.Arguments.FirstOrDefault();
-
-            if (rawName != null)
+            if (commandLine.Arguments.Length < 1)
             {
-                contextName = KubeContextName.Parse(rawName);
+                Console.Error.WriteLine("*** ERROR: USER@HIVE is required.");
+                Program.Exit(1);
+            }
+
+            var login = HiveHelper.SplitLogin(commandLine.Arguments[0]);
+
+            if (!login.IsOK)
+            {
+                Console.Error.WriteLine($"*** ERROR: Invalid username/hive [{commandLine.Arguments[0]}].  Expected something like: USER@HIVE");
+                Program.Exit(1);
+            }
+
+            var username      = login.Username;
+            var hiveName      = login.HiveName;
+            var hiveLoginPath = Program.GetHiveLoginPath(username, hiveName);
+
+            if (File.Exists(hiveLoginPath))
+            {
+                var outputPath = Path.GetFullPath(Path.GetFileName(hiveLoginPath));
+                var loginJson  = File.ReadAllText(hiveLoginPath);
+
+                File.WriteAllText(outputPath, loginJson);
+                Console.Error.WriteLine($"Login exported to: {outputPath}");
             }
             else
             {
-                contextName = KubeHelper.CurrentContextName;
-
-                if (contextName == null)
-                {
-                    Console.Error.WriteLine($"*** ERROR: You are not logged into a cluster.");
-                    Program.Exit(1);
-                }
+                Console.Error.WriteLine($"*** ERROR: Login [{login.Username}@{login.HiveName}] does not exist.");
+                return;
             }
-
-            var context = KubeHelper.Config.GetContext(contextName);
-            var cluster = KubeHelper.Config.GetCluster(context.Properties.Cluster);
-            var user    = KubeHelper.Config.GetUser(context.Properties.User);
-
-            if (context == null)
-            {
-                Console.Error.WriteLine($"*** ERROR: Context [{contextName}] not found.");
-                Program.Exit(1);
-            }
-
-            if (user == null)
-            {
-                Console.Error.WriteLine($"*** ERROR: User [{context.Properties.User}] not found.");
-                Program.Exit(1);
-            }
-
-            var login = new KubeLogin()
-            {
-                Cluster    = cluster,
-                Context    = context,
-                Extensions = KubeHelper.GetContextExtension(contextName),
-                User       = user
-            };
-
-            var yaml = NeonHelper.YamlSerialize(login);
-
-            Console.WriteLine(yaml);
         }
 
         /// <inheritdoc/>

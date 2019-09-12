@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    LoginRemoveCommand.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -28,7 +17,7 @@ using Newtonsoft;
 using Newtonsoft.Json;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
@@ -38,25 +27,21 @@ namespace NeonCli
     public class LoginRemoveCommand : CommandBase
     {
         private const string usage = @"
-Removes a Kubernetes context from the local computer.
+Removes a hive login from the local computer.
 
 USAGE:
 
-    neon login rm       [--force] [ USER@CLUSTER[/NAMESPACE] ]
-    neon login remove   [--force] [ USER@CLUSTER[/NAMESPACE] ]
+    neon login rm       [--force] USER@HIVE
+    neon login remove   [--force] USER@HIVE
 
 ARGUMENTS:
 
-    USER@CLUSTER[/NAMESPACE]    - Kubernetes user, cluster and optional namespace
+    USER        - The operator's user name.
+    HIVE        - The hive name.
 
 OPTIONS:
 
     --force             - Don't prompt, just remove.
-
-REMARKS:
-
-By default, this comman will remove the current login when 
-USER@CLUSTER[/NAMESPACE is not specified.
 ";
 
         /// <inheritdoc/>
@@ -86,49 +71,66 @@ USER@CLUSTER[/NAMESPACE is not specified.
         /// <inheritdoc/>
         public override void Run(CommandLine commandLine)
         {
-            KubeConfigContext   context     = null;
-            KubeContextName     contextName = null;
-
-            if (commandLine.Arguments.Length > 0)
+            if (commandLine.Arguments.Length < 1)
             {
-                contextName = KubeContextName.Parse(commandLine.Arguments.FirstOrDefault());
+                Console.Error.WriteLine("*** ERROR: USER@HIVE is required.");
+                Program.Exit(1);
             }
 
-            if (contextName != null)
-            {
-                context = KubeHelper.Config.GetContext(contextName);
+            var login = HiveHelper.SplitLogin(commandLine.Arguments[0]);
 
-                if (context == null)
+            if (!login.IsOK)
+            {
+                Console.Error.WriteLine($"*** ERROR: Invalid username/hive [{commandLine.Arguments[0]}].  Expected something like: USER@HIVE");
+                Program.Exit(1);
+            }
+
+            var username      = login.Username;
+            var hiveName      = login.HiveName;
+            var hiveLoginPath = Program.GetHiveLoginPath(username, hiveName);
+
+            if (File.Exists(hiveLoginPath))
+            {
+                if (!commandLine.HasOption("--force") && !Program.PromptYesNo($"*** Are you sure you want to remove the [{username}@{hiveName}] login?"))
                 {
-                    Console.Error.WriteLine($"*** ERROR: Context [{contextName}] not found.");
-                    Program.Exit(1);
+                    return;
                 }
+
+                File.Delete(hiveLoginPath);
+
+                // Delete the backup and cached hive definition files if present.
+
+                var backupPath     = hiveLoginPath + ".bak";
+                var definitionPath = HiveHelper.GetCachedDefinitionPath(username, hiveName);
+
+                if (File.Exists(backupPath))
+                {
+                    File.Delete(backupPath);
+                }
+
+                if (File.Exists(definitionPath))
+                {
+                    File.Delete(definitionPath);
+                }
+
+                // Remove the [.current] file if this is the logged-in hive.
+
+                if (Program.HiveLogin != null && 
+                    string.Equals(Program.HiveLogin.Username, username, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(Program.HiveLogin.HiveName, hiveName, StringComparison.OrdinalIgnoreCase))
+                {
+                    CurrentHiveLogin.Delete();
+                    HiveHelper.VpnClose(hiveName);
+                }
+
+                Console.WriteLine($"Removed [{username}@{hiveName}]");
             }
             else
             {
-                context = KubeHelper.CurrentContext;
-
-                if (context == null)
-                {
-                    Console.Error.WriteLine($"*** ERROR: You are not logged into a cluster.");
-                    Program.Exit(1);
-                }
-
-                contextName = (KubeContextName)context.Name;
-            }
-
-            if (!commandLine.HasOption("--force") && !Program.PromptYesNo($"*** Are you sure you want to remove: {contextName}?"))
-            {
+                Console.Error.WriteLine($"*** ERROR: Login [{username}@{hiveName}] does not exist.");
                 return;
             }
 
-            if (KubeHelper.CurrentContextName == contextName)
-            {
-                Console.WriteLine($"Logging out of: {contextName}");
-            }
-
-            KubeHelper.Config.RemoveContext(context);
-            Console.WriteLine($"Removed: {contextName}");
         }
 
         /// <inheritdoc/>

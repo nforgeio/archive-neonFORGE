@@ -1,4 +1,4 @@
-# neonKUBE Release Process:
+# neonHIVE Release Process:
 
 ## Prepare
 
@@ -12,9 +12,9 @@
 
 5. Build and publish all of the Docker images: `powershell -file publish.ps1 -all`
 
-6. Deploy a test cluster.
+6. Deploy a test hive.
 
-7. Run all unit tests against the test cluster and fix any bugs until all tests pass.
+7. Run all unit tests against the test hive and fix any bugs until all tests pass.
 
 ## Release 
 
@@ -31,19 +31,19 @@
 
 6. Execute **as ADMIN**: `powershell -f %NF_ROOT%/Toolbin/nuget-neonforge-public.ps1` to publish the packages to **NuGet.org**.
 
-7. Commit all changes with a comment like: **RELEASE: 1.0.0+1901** but **DO NOT** push to GitHub yet.
+7. Commit all changes with a comment like: **RELEASE: 18.10.0-alpha.4** but **DO NOT** push to GitHub yet.
 
 8. Build and publish all of the Docker images: `powershell -file publish.ps1 -all`
 
-9. Upgrade an older cluster and verify by running cluster unit tests.
+9. Upgrade an older hive and verify by running Hive unit tests.
 
-10. Deploy a fresh cluster and verify by running the cluster unit tests.
+10. Deploy a fresh hive and verify by running the hive unit tests.
 
 11. Fix any important issues and commit the changes.
 
 12. Push the **PROD** branch to GitHub.
 
-13. Create a new Git branch from PROD named for the release (like **release-1.0.0+1901**) and push to GitHub.
+13. Create a new Git branch from PROD named for the release (like **release-18.10.0-alpha.4**) and push to GitHub.
 
 ## Post Release
 
@@ -59,11 +59,12 @@
 
  # Release Version Conventions
 
-* Use semantic versioning.
-* The MAJOR, MINOR, and PATCH versions work as defined: [here](https://semver.org/)
-* Patch versions start at 0.
-* The release year and month is encoded as build metadata as YYMM as in: **1.0.0+1901**
-* Intermediate development releases will use versions like: **MAJOR.MINOR.PATCH+1901-alpha-#** where **YYMM* specifies the scheduled month for the release and **#** starts at **0** and is incremented for every development release made since the last stable release.  Intermediate releases are not generally intended for public consumption.
-* If a Stable release slips passed the scheduled release month, we'll retain the old month for up to 15 days into the next month.  Past that, we'll update **YYMM** to the actual published month.
-* Non-production releases that are stable enough for limited public consumption will look like: **MAJOR.MINOR.PATCH+1901-preview-#**
-* Near production release candidates will look like: **MAJOR.MINOR.PATCH+1901-rc-#**
+* Stable, Edge and and LTS releases will continue to use the **YY.M.PATCH** convention where the month.
+* Patch releases are guaranteed to be backwards compatible.
+* Releases where one or both of YY or M were advanced may not be backwards compatible but we'll try very hard to avoid these issues or provide an upgrade path.
+* The month field **will not** include a leading **""0""** due to NuGet issues.
+* Intermediate development releases will use versions like: **YY.M.0-alpha.N** where **YY.M* specifies the actual date for the release and **N** starts at **0** and is incremented for every development release made since the Stable, Edge, or LTS release.  Intermediate releases are not generally intended for public consumption.
+* Intermediate public releases are called previews.  There are types of preview release:
+  * Preview of a patch release for an existing release.  This will look like **YY.M.PATCH-preview-N** where **PATCH** is the scheduled patch number and **N** starts at **0** and is incremented for every preview release for the patch.
+  * Preview of an upcoming Stable, Edge, or LTS release.  These release versions will look like **YY.M.0-preview-B** where **YY.M** is the expected release month.
+* If a Stable, Edge, or LTS release slips passed the scheduled release month, we'll retain the old month for up to 15 days into the next month.  Past that, we'll update **YY.M** to the actual published month.

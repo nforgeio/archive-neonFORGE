@@ -1,23 +1,11 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    Test_Helper.Yaml.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
 using System.Dynamic;
-using System.Runtime.Serialization;
 
 using Neon.Common;
 using Neon.Xunit;
@@ -29,22 +17,10 @@ namespace TestCommon
 {
     public partial class Test_Helper
     {
-        public enum YamlGender
-        {
-            Unknown = 0,
-
-            [EnumMember(Value = "gender-female")]
-            Female,
-
-            [EnumMember(Value = "gender-male")]
-            Male,
-        }
-
         public class YamlPerson
         {
             public string Name { get; set; }
             public int Age { get; set; }
-            public YamlGender Gender { get; set; }
         }
 
         [Fact]
@@ -55,8 +31,7 @@ namespace TestCommon
                 new YamlPerson()
                 {
                     Name = "Jeff",
-                    Age  = 56,
-                    Gender = YamlGender.Unknown
+                    Age  = 56
                 };
 
             // Verify that the property names were converted to lowercase.
@@ -65,7 +40,6 @@ namespace TestCommon
 
             Assert.Contains("name: Jeff", yaml);
             Assert.Contains("age: 56", yaml);
-            Assert.Contains("gender: Unknown", yaml);
 
             // Verify that we can deserialize.
 
@@ -73,36 +47,6 @@ namespace TestCommon
 
             Assert.Equal("Jeff", after.Name);
             Assert.Equal(56, after.Age);
-            Assert.Equal(YamlGender.Unknown, after.Gender);
-        }
-
-        [Fact]
-        [Trait(TestCategory.CategoryTrait, TestCategory.NeonCommon)]
-        public void YamlEnumMember()
-        {
-            // Verify that we recognize [EnumMember] attributes.
-
-            var before =
-                new YamlPerson()
-                {
-                    Name = "Jeff",
-                    Age = 56,
-                    Gender = YamlGender.Male
-                };
-
-            var yaml = NeonHelper.YamlSerialize(before);
-
-            Assert.Contains("name: Jeff", yaml);
-            Assert.Contains("age: 56", yaml);
-            Assert.Contains("gender: gender-male", yaml);
-
-            // Verify that we can deserialize.
-
-            var after = NeonHelper.YamlDeserialize<YamlPerson>(yaml);
-
-            Assert.Equal("Jeff", after.Name);
-            Assert.Equal(56, after.Age);
-            Assert.Equal(YamlGender.Male, after.Gender);
         }
 
         [Fact]

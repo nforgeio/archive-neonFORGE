@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    CouchbaseSettings.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -63,7 +52,6 @@ namespace Neon.Data
         /// problems if any single node is down.
         /// </remarks>
         [JsonProperty(PropertyName = "Servers", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "Servers", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public List<Uri> Servers { get; set; } = new List<Uri>();
 
@@ -71,7 +59,6 @@ namespace Neon.Data
         /// Optionally specifies the name of the target Couchbase bucket.
         /// </summary>
         [JsonProperty(PropertyName = "Bucket", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "Bucket", ApplyNamingConventions = false)]
         [DefaultValue(null)]
         public string Bucket { get; set; }
 
@@ -79,7 +66,6 @@ namespace Neon.Data
         /// Maximum time (milliseconds) to wait to establish a server connection (defaults to <b>10 seconds</b>).
         /// </summary>
         [JsonProperty(PropertyName = "ConnectTimeout", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "ConnectTimeout", ApplyNamingConventions = false)]
         [DefaultValue(10000)]
         public int ConnectTimeout { get; set; } = 10000;
 
@@ -87,7 +73,6 @@ namespace Neon.Data
         /// Maximum time (milliseconds) to wait to transmit a server request (defaults to <b>10 seconds</b>).
         /// </summary>
         [JsonProperty(PropertyName = "SendTimeout", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "SendTimeout", ApplyNamingConventions = false)]
         [DefaultValue(10000)]
         public int SendTimeout { get; set; } = 10000;
 
@@ -95,7 +80,6 @@ namespace Neon.Data
         /// Maximum time (milliseconds) to wait for an operation to complete (defaults to <b>10 seconds</b>).
         /// </summary>
         [JsonProperty(PropertyName = "OperationTimeout", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "OperationTimeout", ApplyNamingConventions = false)]
         [DefaultValue(10000)]
         public int OperationTimeout { get; set; } = 10000;
 
@@ -103,7 +87,6 @@ namespace Neon.Data
         /// Maximum time (milliseconds) to wait for a non-view query to complete (defaults to 75 seconds).
         /// </summary>
         [JsonProperty(PropertyName = "QueryRequestTimeout", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "QueryRequestTimeout", ApplyNamingConventions = false)]
         [DefaultValue(75000)]
         public int QueryRequestTimeout { get; set; } = 75000;
 
@@ -111,7 +94,6 @@ namespace Neon.Data
         /// Maximum time (milliseconds) to wait for a view query to complete (defaults to 75 seconds).
         /// </summary>
         [JsonProperty(PropertyName = "ViewRequestTimeout", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "ViewRequestTimeout", ApplyNamingConventions = false)]
         [DefaultValue(75000)]
         public int ViewRequestTimeout { get; set; } = 75000;
 
@@ -119,7 +101,6 @@ namespace Neon.Data
         /// Maximum number of pooled connections to a server bucket (defaults to <b>5</b>).
         /// </summary>
         [JsonProperty(PropertyName = "MaxPoolConnections", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "MaxPoolConnections", ApplyNamingConventions = false)]
         [DefaultValue(5)]
         public int MaxPoolConnections { get; set; } = 5;
 
@@ -127,7 +108,6 @@ namespace Neon.Data
         /// Minimum number of pooled connections to a server bucket (defaults to <b>2</b>).
         /// </summary>
         [JsonProperty(PropertyName = "MinPoolConnections", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "MinPoolConnections", ApplyNamingConventions = false)]
         [DefaultValue(2)]
         public int MinPoolConnections { get; set; } = 2;
 
@@ -137,7 +117,6 @@ namespace Neon.Data
         /// matter.  This defaults to <c>false</c>.
         /// </summary>
         [JsonProperty(PropertyName = "UseEnhancedDurability", Required = Required.Default, DefaultValueHandling = DefaultValueHandling.IgnoreAndPopulate)]
-        [YamlMember(Alias = "UseEnhancedDurability", ApplyNamingConventions = false)]
         [DefaultValue(false)]
         public bool UseEnhancedDurability { get; set; } = false;
 

@@ -1,19 +1,8 @@
 ﻿#------------------------------------------------------------------------------
 # FILE:         publish.ps1
 # CONTRIBUTOR:  Jeff Lill
-# COPYRIGHT:    Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
+# COPYRIGHT:    Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-
 # Builds and publishes all of the Neon Docker images.
 #
 # NOTE: You must be logged into Docker Hub.
@@ -24,7 +13,7 @@ param
 (
 	[switch]$all         = $False,        # Rebuild all images
 	[switch]$base        = $False,        # Rebuild base images
-	[switch]$dotnetBase  = $False,        # Rebuild base .NET images
+	[switch]$dotnetBase  = $False,        # Rebuild .NET base images
 	[switch]$dotnet      = $False,        # Rebuild .NET based images
 	[switch]$other       = $False,        # Rebuild all other images (usually script based)
     [switch]$nopush      = $False,        # Don't push to the registry
@@ -119,7 +108,15 @@ if ($base)
 	# Other base images:
 
 	Publish "$image_root\\golang"
+	Publish "$image_root\\elasticsearch"
+	Publish "$image_root\\kibana"
+	Publish "$image_root\\metricbeat"
+	Publish "$image_root\\kong"
+	Publish "$image_root\\td-agent"
+	Publish "$image_root\\node"
 	Publish "$image_root\\haproxy"
+	Publish "$image_root\\neon-registry"
+	Publish "$image_root\\neon-registry-cache"
 }
 
 if ($dotnetBase)
@@ -128,15 +125,30 @@ if ($dotnetBase)
 	Publish "$image_root\\aspnet"
 	Publish "$image_root\\ubuntu-16.04-dotnet"
 	Publish "$image_root\\ubuntu-16.04-aspnet"
+	Publish "$image_root\\varnish"
 }
 
 if ($dotnet)
 {
 	Publish "$image_root\\neon-cli"
+	Publish "$image_root\\neon-hive-manager"
+	Publish "$image_root\\neon-dns"
+	Publish "$image_root\\neon-dns-mon"
+	Publish "$image_root\\neon-proxy"
+    Publish "$image_root\\neon-proxy-cache"
+	Publish "$image_root\\neon-proxy-manager"
+	Publish "$image_root\\neon-secret-retriever"
+    Publish "$image_root\\vegomatic"
 }
 
 if ($other)
 {
+	Publish "$image_root\\neon-log-collector"
+	Publish "$image_root\\neon-log-host"
+	Publish "$image_root\\neon-proxy-vault"
+	Publish "$image_root\\neon-hivemq"
 	Publish "$image_root\\couchbase-test"
+	Publish "$image_root\\rabbitmq-test"
 	Publish "$image_root\\test"
+	Publish "$image_root\\varnish-builder"
 }

@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    LogoutCommand.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -28,7 +17,7 @@ using Newtonsoft;
 using Newtonsoft.Json;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
@@ -38,7 +27,7 @@ namespace NeonCli
     public class LogoutCommand : CommandBase
     {
         private const string usage = @"
-Logs out of the current Kubernetes context.
+Logs out of a hive.
 
 USAGE:
 
@@ -60,19 +49,30 @@ USAGE:
         /// <inheritdoc/>
         public override void Run(CommandLine commandLine)
         {
+            var hiveLogin = Program.HiveLogin;
+
             Console.WriteLine("");
+
+            // Close all VPN connections even if we're not officially logged in.
+            //
+            // We're passing NULL to close all hive VPN connections to ensure that 
+            // we're only connected to one at a time.  It's very possible for a operator
+            // to have to manage multiple disconnnected hives that share the same
+            // IP address space.
+
+            HiveHelper.VpnClose(null); 
 
             // Actually logout.
 
-            if (KubeHelper.CurrentContext == null)
+            if (hiveLogin == null)
             {
-                Console.WriteLine($"You're not logged into a cluster.");
-                return;
+                return; // Not logged in.
             }
 
-            Console.WriteLine($"Logging out of: {KubeHelper.CurrentContext.Name}");
-            KubeHelper.SetCurrentContext((string)null);
+            Console.WriteLine($"Logging out of [{hiveLogin.HiveName}].");
             Console.WriteLine("");
+
+            CurrentHiveLogin.Delete();
         }
 
         /// <inheritdoc/>

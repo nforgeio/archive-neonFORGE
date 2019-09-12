@@ -1,19 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    NeonHelper.Yaml.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -28,7 +16,6 @@ using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
 using YamlDotNet.Core;
-using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -51,42 +38,6 @@ namespace Neon.Common
             }
         }
 
-        /// <summary>
-        /// Customizes <c>enum</c> type conversions to/from strings recognizing
-        /// <c>[EnumMember]</c> attributes when present.
-        /// </summary>
-        private class YamlEnumTypeConverter : IYamlTypeConverter
-        {
-            /// <inheritdoc/>
-            public bool Accepts(Type type)
-            {
-                return type.IsEnum;
-            }
-
-            /// <inheritdoc/>
-            public object ReadYaml(IParser parser, Type type)
-            {
-                var scaler = parser.Current as Scalar;
-
-                parser.MoveNext();
-
-                if (TryParseEnum(type, scaler.Value, out var output))
-                {
-                    return output;
-                }
-                else
-                {
-                    throw new InvalidDataException($"Cannot parse enumeration: {type.FullName}={scaler.Value}");
-                }
-            }
-
-            /// <inheritdoc/>
-            public void WriteYaml(IEmitter emitter, object value, Type type)
-            {
-                emitter.Emit(new Scalar(null, NeonHelper.EnumToString(type, value)));
-            }
-        }
-
         //---------------------------------------------------------------------
         // Implementation
 
@@ -95,28 +46,6 @@ namespace Neon.Common
                 () =>
                 {
                     return new SerializerBuilder()
-
-                        // Note that we need to emit default values because it appears
-                        // that YamlDotNet does not recognize the [DefaultValue] attributes
-                        // and instead won't emit anything for zero values.  This means
-                        // that without this, zero integers, doubles, null strings or
-                        // enums with 0 values won't be emitted by default.
-                        //
-                        // Issues:
-                        //
-                        //      https://github.com/aaubry/YamlDotNet/issues/251
-                        //      https://github.com/aaubry/YamlDotNet/issues/298
-
-                        .EmitDefaults()
-
-                        // We also need a custom type converter that honors [EnumMember]
-                        // attributes on enumeration values.
-                        //
-                        //      https://www.cyotek.com/blog/using-custom-type-converters-with-csharp-and-yamldotnet-part-1
-                        //      https://www.cyotek.com/blog/using-custom-type-converters-with-csharp-and-yamldotnet-part-2
-
-                        .WithTypeConverter(new YamlEnumTypeConverter())
-
                         .WithNamingConvention(new LowercaseYamlNamingConvention())
                         .Build();
                 });
@@ -126,7 +55,6 @@ namespace Neon.Common
                 () =>
                 {
                     return new DeserializerBuilder()
-                        .WithTypeConverter(new YamlEnumTypeConverter())
                         .WithNamingConvention(new LowercaseYamlNamingConvention())
                         .Build();
                 });
@@ -136,7 +64,6 @@ namespace Neon.Common
                 () =>
                 {
                     return new DeserializerBuilder()
-                        .WithTypeConverter(new YamlEnumTypeConverter())
                         .WithNamingConvention(new LowercaseYamlNamingConvention())
                         .IgnoreUnmatchedProperties()
                         .Build();
@@ -361,7 +288,7 @@ namespace Neon.Common
             {
                 case JTokenType.Boolean:
 
-                    return NeonHelper.ToBoolString((bool)jValue.Value);
+                    return (bool)jValue.Value ? "true" : "false";
 
                 case JTokenType.Integer:
                 case JTokenType.Float:

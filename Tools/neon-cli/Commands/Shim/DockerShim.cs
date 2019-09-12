@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    DockerShim.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -29,7 +18,7 @@ using Newtonsoft;
 using Newtonsoft.Json;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
@@ -53,7 +42,7 @@ namespace NeonCli
 
             this.CommandLine = commandLine;
 
-            // We're going to locate the shim folder within the root [neonkube] folder within
+            // We're going to the shim folder within the root [neonhive] folder within
             // the user's home directory.  The root directory is encrypted for Windows and is
             // hopefully encrypted for Linux and OSX.  Encryption is advisable because we may
             // map be passing confidential information into the container.
@@ -61,14 +50,14 @@ namespace NeonCli
             // Note that we're also generating a unique folder name so that multiple commands
             // may be running in parallel.
 
-            ShimExternalFolder = Path.Combine(KubeHelper.TempFolder, $"shim-{Guid.NewGuid().ToString("D")}");
+            ShimExternalFolder = Path.Combine(Program.HiveTempFolder, $"shim-{Guid.NewGuid().ToString("D")}");
 
             Directory.CreateDirectory(ShimExternalFolder);
 
             // Write the original command line to a special shim file so the [neon-cli]
             // in the container can display the command line the operator specified.
 
-            File.WriteAllText(Path.Combine(ShimExternalFolder, "__shim.org"), Program.CommandLine.ToString());
+            File.WriteAllText(Path.Combine(ShimExternalFolder, "__shim.org"), Program.SafeCommandLine);
         }
 
         /// <summary>
@@ -141,7 +130,7 @@ namespace NeonCli
             // IMPORTANT:
             //
             // Do not change this without also updating the path in the
-            // [nkubeio/neon-cli] container scripts.
+            // [nhive/neon-cli] container scripts.
 
             get { return "/shim"; }
         }

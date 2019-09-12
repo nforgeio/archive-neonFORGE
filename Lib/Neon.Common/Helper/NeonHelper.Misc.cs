@@ -1,19 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    NeonHelper.Misc.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -1232,21 +1220,9 @@ namespace Neon.Common
         private static EnumMemberSerializationInfo GetEnumMembers<TEnum>()
             where TEnum : struct
         {
-            return GetEnumMembers(typeof(TEnum));
-        }
-
-        /// <summary>
-        /// Returns the serialization information for an enumeration type.
-        /// </summary>
-        /// <param name="type">The enumeration type.</param>
-        private static EnumMemberSerializationInfo GetEnumMembers(Type type)
-        {
-            Covenant.Requires<ArgumentNullException>(type != null);
-            Covenant.Requires<ArgumentException>(type.IsEnum);
-
             lock (typeToEnumMemberInfo)
             {
-                if (typeToEnumMemberInfo.TryGetValue(type, out var info))
+                if (typeToEnumMemberInfo.TryGetValue(typeof(TEnum), out var info))
                 {
                     return info;
                 }
@@ -1262,7 +1238,7 @@ namespace Neon.Common
 
             var newInfo = new EnumMemberSerializationInfo();
 
-            foreach (var member in type.GetFields(BindingFlags.Public | BindingFlags.Static))
+            foreach (var member in typeof(TEnum).GetFields(BindingFlags.Public | BindingFlags.Static))
             {
                 var enumMember = member.GetCustomAttribute<EnumMemberAttribute>();
 
@@ -1271,7 +1247,7 @@ namespace Neon.Common
                     var ordinal = Convert.ToInt64(member.GetRawConstantValue());
 
                     newInfo.EnumToStrings[enumMember.Value] = ordinal;
-                    newInfo.EnumToOrdinals[ordinal] = enumMember.Value;
+                    newInfo.EnumToOrdinals[ordinal]         = enumMember.Value;
                 }
             }
 
@@ -1340,6 +1316,8 @@ namespace Neon.Common
         /// <param name="input">The input string.</param>
         /// <param name="output">Returns as the parsed value.</param>
         /// <returns><c>true</c> if the value was parsed.</returns>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="input"/> is <c>null</c>.</exception>
+        /// <exception cref="ArgumentException">Thrown if <paramref name="input"/> is not valid.</exception>
         public static bool TryParse<TEnum>(string input, out TEnum output)
             where TEnum : struct
         {
@@ -1364,40 +1342,6 @@ namespace Neon.Common
         }
 
         /// <summary>
-        /// <c>enum</c> parser that also honors any <see cref="EnumMemberAttribute"/>
-        /// decorating the enumeration values.  This is case insensitive.
-        /// </summary>
-        /// <param name="type">The enumeration type.</param>
-        /// <param name="input">The input string.</param>
-        /// <param name="output">Returns as the parsed value.</param>
-        /// <returns><c>true</c> if the value was parsed.</returns>
-        public static bool TryParseEnum(Type type, string input, out object output)
-        {
-            var info = GetEnumMembers(type);
-
-            if (info.EnumToStrings.TryGetValue(input, out var value1))
-            {
-                output = Enum.ToObject(type, value1);
-
-                return true;
-            }
-
-            // Try parsing the enumeration using the standard mechanism.
-            // Note that this does not honor any [EnumMember] attributes.
-
-            try
-            {
-                output = Enum.Parse(type, input, ignoreCase: true);
-                return true;
-            }
-            catch
-            {
-                output = null;
-                return false;
-            }
-        }
-
-        /// <summary>
         /// Type-safe <c>enum</c> serializer that also honors any <see cref="EnumMemberAttribute"/>
         /// decorating the enumeration values.
         /// </summary>
@@ -1408,31 +1352,6 @@ namespace Neon.Common
             where TEnum : struct
         {
             var info = GetEnumMembers<TEnum>();
-
-            if (info.EnumToOrdinals.TryGetValue(Convert.ToInt64(input), out var value))
-            {
-                return value;
-            }
-            else
-            {
-                return input.ToString();
-            }
-        }
-
-        /// <summary>
-        /// Type-safe <c>enum</c> serializer that also honors any <see cref="EnumMemberAttribute"/>
-        /// decorating the enumeration values.
-        /// </summary>
-        /// <param name="type">The enumeration type.</param>
-        /// <param name="input">The input value.</param>
-        /// <returns>The deserialized value.</returns>
-        public static string EnumToString(Type type, object input)
-        {
-            Covenant.Requires<ArgumentNullException>(type != null);
-            Covenant.Requires<ArgumentNullException>(input != null);
-            Covenant.Requires<ArgumentException>(type.IsEnum);
-
-            var info = GetEnumMembers(type);
 
             if (info.EnumToOrdinals.TryGetValue(Convert.ToInt64(input), out var value))
             {
@@ -1864,17 +1783,6 @@ namespace Neon.Common
             }
 
             return text;
-        }
-
-        /// <summary>
-        /// Renders a <c>bool</c> value as either <b>true</b> or <b>false</b>
-        /// (lower case).
-        /// </summary>
-        /// <param name="value">The value.</param>
-        /// <returns><b>true</b> or <b>false</b>,</returns>
-        public static string ToBoolString(bool value)
-        {
-            return value ? "true" : "false";
         }
     }
 }

@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    LoginListCommand.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -28,7 +17,7 @@ using Newtonsoft;
 using Newtonsoft.Json;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
@@ -42,34 +31,69 @@ namespace NeonCli
 
         private class LoginInfo
         {
-            public LoginInfo(KubeConfigContext context)
+            public LoginInfo(HiveLogin hiveLogin, bool viaVpn)
             {
-                this.Name = context.Name;
+                Name   = hiveLogin.LoginName;
+                ViaVpn = viaVpn;
 
-                var sbInfo = new StringBuilder();
+                var info = string.Empty;
 
-                if (context.Extensions.SetupDetails.SetupPending)
+                if (hiveLogin.IsRoot)
                 {
-                    sbInfo.AppendWithSeparator("setup");
+                    if (info.Length > 0)
+                    {
+                        info += ", ";
+                    }
+
+                    info += "root";
                 }
 
-                this.Info = sbInfo.ToString();
+                if (hiveLogin.SetupPending)
+                {
+                    if (info.Length > 0)
+                    {
+                        info += ", ";
+                    }
+
+                    info += "setup";
+                }
+
+                if (ViaVpn)
+                {
+                    if (info.Length > 0)
+                    {
+                        info += ", ";
+                    }
+
+                    info += "via VPN";
+                }
+
+                if (info.Length > 0)
+                {
+                    this.Info = $"[{info}]";
+                }
+                else
+                {
+                    this.Info = string.Empty;
+                }
             }
 
             public string Name;
             public string Info;
+            public bool ViaVpn;
         }
 
         //---------------------------------------------------------------------
         // Implementation
         
         private const string usage = @"
-Lists the Kubernetes contexts available on the local computer.
+Lists the hive logins available on the local computer.
 
 USAGE:
 
     neon login list
     neon login ls
+
 ";
 
         /// <inheritdoc/>
@@ -93,27 +117,45 @@ USAGE:
         /// <inheritdoc/>
         public override void Run(CommandLine commandLine)
         {
-            var current = KubeHelper.CurrentContext;
+            var current = CurrentHiveLogin.Load();
             var logins  = new List<LoginInfo>();
 
-            foreach (var context in KubeHelper.Config.Contexts.OrderBy(c => c.Name))
+            foreach (var file in Directory.EnumerateFiles(Program.HiveLoginFolder, "*.login.json", SearchOption.TopDirectoryOnly))
             {
-                logins.Add(new LoginInfo(context));
+                try
+                {
+                    var login  = NeonHelper.JsonDeserialize<HiveLogin>(File.ReadAllText(file));
+                    var useVpn = false;
+
+                    if (current != null && string.Equals(current.Login, login.LoginName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        useVpn = current.ViaVpn;
+                    }
+
+                    logins.Add(new LoginInfo(login, useVpn));
+                }
+                catch (Exception e)
+                {
+                    Console.Error.WriteLine($"*** ERROR: Cannot read [{file}].  Details: {NeonHelper.ExceptionError(e)}");
+                    Program.Exit(1);
+                }
             }
 
             Console.WriteLine();
 
             if (logins.Count == 0)
             {
-                Console.Error.WriteLine("*** No Kubernetes contexts.");
+                Console.Error.WriteLine("*** No hive logins");
             }
             else
             {
                 var maxLoginNameWidth = logins.Max(l => l.Name.Length);
 
-                foreach (var login in logins.OrderBy(c => c.Name))
+                foreach (var login in logins
+                    .OrderBy(c => c.Name.Split('@')[1].ToLowerInvariant())
+                    .ThenBy(c => c.Name.Split('@')[0].ToLowerInvariant()))
                 {
-                    if (current != null && login.Name == current.Name)
+                    if (current != null && string.Equals(current.Login, login.Name, StringComparison.OrdinalIgnoreCase))
                     {
                         Console.Write(" --> ");
                     }
@@ -125,9 +167,9 @@ USAGE:
                     var padding = new string(' ', maxLoginNameWidth - login.Name.Length);
 
                     Console.Write($"{login.Name}{padding}    {login.Info}");
-                }
 
-                Console.WriteLine();
+                    Console.WriteLine();
+                }
             }
         }
 

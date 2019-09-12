@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    ResourceFiles.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -24,7 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using Neon.Common;
-using Neon.Kube;
+using Neon.Hive;
 
 namespace NeonCli
 {
@@ -51,7 +40,7 @@ namespace NeonCli
             /// </summary>
             /// <param name="name">The local file name.</param>
             /// <param name="hasVariables">
-            /// Indicates whether the file references variables from a <see cref="ClusterDefinition"/>
+            /// Indicates whether the file references variables from a <see cref="HiveDefinition"/>
             /// that need to be expanded.
             /// </param>
             public File(string name, bool hasVariables = false)
@@ -90,7 +79,7 @@ namespace NeonCli
             }
 
             /// <summary>
-            /// Indicates whether the file references variables from a <see cref="ClusterDefinition"/>
+            /// Indicates whether the file references variables from a <see cref="HiveDefinition"/>
             /// that need to be expanded.
             /// </summary>
             public bool HasVariables { get; private set; }
@@ -261,41 +250,49 @@ namespace NeonCli
                             new File("logstash-index-pattern.json", hasVariables: false),
                             new File("logstash-template.json", hasVariables: false)
                         }),
-                    new Folder("Ubuntu-18.04",
+                    new Folder("Ubuntu-16.04",
                         folders: new List<Folder>()
                         {
-                            new Folder("binary",
-                                files: new List<File>()
-                                {
-                                    new File("safe-apt-get.sh", hasVariables: true)
-                                }),
                             new Folder("conf",
                                 files: new List<File>()
                                 {
-                                    new File("cluster.conf.sh", hasVariables: true),
+                                    new File("hive.conf.sh", hasVariables: true),
                                 }),
                             new Folder("setup",
                                 files: new List<File>()
                                 {
+                                    new File("setup-apt-proxy.sh", hasVariables: true),
+                                    new File("setup-consul-proxy.sh", hasVariables: true),
+                                    new File("setup-consul-server.sh", hasVariables: true),
                                     new File("setup-disk.sh", hasVariables: true),
                                     new File("setup-docker.sh", hasVariables: true),
                                     new File("setup-environment.sh", hasVariables: true),
                                     new File("setup-exists.sh", hasVariables: true),
                                     new File("setup-node.sh", hasVariables: true),
                                     new File("setup-ntp.sh", hasVariables: true),
-                                    new File("setup-package-proxy.sh", hasVariables: true),
-                                    new File("setup-prep.sh", hasVariables: true),
+                                    new File("setup-prep-node.sh", hasVariables: true),
                                     new File("setup-ssd.sh", hasVariables: true),
                                     new File("setup-utility.sh", hasVariables: true),
+                                    new File("setup-vault-server.sh", hasVariables: true),
+                                    new File("setup-vault-client.sh", hasVariables: true)
+                                }),
+                            new Folder("tools",
+                                files: new List<File>()
+                                {
+                                    new File("docker-volume-create.sh", hasVariables: true),
+                                    new File("docker-volume-exists.sh", hasVariables: true),
+                                    new File("docker-volume-rm.sh", hasVariables: true),
+                                    new File("safe-apt-get.sh", hasVariables: true)
                                 }),
                             new Folder("updates",
                                 files: new List<File>()
                                 {
+                                    new File("010297_010298.zip", hasVariables: false)
                                 })
                         })
                 });
 
-            // We need to wire up the folder paths.  Note that we need to strip
+            // We need to wireup the folder paths.  Note that we need to strip
             // off the leading "file:" for Linux/OSX or "file:///" for Windows.
 
             string prefix;

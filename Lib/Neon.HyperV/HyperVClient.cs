@@ -1,18 +1,7 @@
 ﻿//-----------------------------------------------------------------------------
 // FILE:	    HyperVClient.cs
 // CONTRIBUTOR: Jeff Lill
-// COPYRIGHT:	Copyright (c) 2016-2019 by neonFORGE, LLC.  All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
+// COPYRIGHT:	Copyright (c) 2016-2018 by neonFORGE, LLC.  All rights reserved.
 
 using System;
 using System.Collections.Generic;
@@ -170,8 +159,8 @@ namespace Neon.HyperV
         /// <param name="machineName">The machine name.</param>
         /// <param name="memorySize">
         /// A string specifying the memory size.  This can be a long byte count or a
-        /// byte count or a number with units like <b>512MiB</b>, <b>0.5GiB</b>, <b>2GiB</b>, 
-        /// or <b>1TiB</b>.  This defaults to <b>2GiB</b>.
+        /// byte count or a number with units like <b>512MB</b>, <b>0.5GB</b>, <b>2GB</b>, 
+        /// or <b>1TB</b>.  This defaults to <b>2GB</b>.
         /// </param>
         /// <param name="minimumMemorySize">
         /// Optionally specifies the minimum memory size.  This defaults to <c>null</c> which will
@@ -182,8 +171,8 @@ namespace Neon.HyperV
         /// </param>
         /// <param name="diskSize">
         /// A string specifying the primary disk size.  This can be a long byte count or a
-        /// byte count or a number with units like <b>512MB</b>, <b>0.5GiB</b>, <b>2GiB</b>, 
-        /// or <b>1TiB</b>.  This defaults to <b>64GiB</b>.
+        /// byte count or a number with units like <b>512MB</b>, <b>0.5GB</b>, <b>2GB</b>, 
+        /// or <b>1TB</b>.  This defaults to <b>64GB</b>.
         /// </param>
         /// <param name="drivePath">
         /// Optionally specifies the path where the virtual hard drive will be located.  Pass 
@@ -212,10 +201,10 @@ namespace Neon.HyperV
         /// </remarks>
         public void AddVM(
             string                      machineName, 
-            string                      memorySize        = "2GiB", 
+            string                      memorySize        = "2GB", 
             string                      minimumMemorySize = null, 
             int                         processorCount    = 4,
-            string                      diskSize          = "64GiB",
+            string                      diskSize          = "64GB",
             string                      drivePath         = null,
             bool                        checkpointDrives  = false,
             string                      templateDrivePath = null, 
@@ -548,7 +537,7 @@ namespace Neon.HyperV
                             Name = rawSwitch.Name
                         };
 
-                    switch (rawSwitch.SwitchType.Value)
+                    switch (rawSwitch.SwitchType)
                     {
                         case "Internal":
 
@@ -588,7 +577,7 @@ namespace Neon.HyperV
         /// to the ethernet adapter named <b>Ethernet</b>.
         /// </summary>
         /// <param name="switchName">The new switch name.</param>
-        /// <param name="gateway">Address of the cluster network gateway, used to identify a connected network interface.</param>
+        /// <param name="gateway">Address of the hive network gateway, used to identify a connected network interface.</param>
         public void NewVMExternalSwitch(string switchName, IPAddress gateway)
         {
             Covenant.Requires<ArgumentNullException>(!string.IsNullOrEmpty(switchName));
@@ -606,17 +595,17 @@ namespace Neon.HyperV
             //
             // This may be a problem for machines with multiple active network interfaces
             // because I may choose the wrong one (e.g. the slower card).  It might be
-            // useful to have an optional cluster node definition property the explicitly
+            // useful to have an optional hive node definition property the explicitly
             // specifies the adapter to use for a given node.
             //
             // Another problem we'll see is for laptops with wi-fi adapters.  Lets say we
-            // setup a cluster when wi-fi is connected and then the user docks the laptop,
-            // connecting to a new wired adapter.  The cluster's virtual switch will still
+            // setup a hive when wi-fi is connected and then the user docks the laptop,
+            // connecting to a new wired adapter.  The hive's virtual switch will still
             // be configured to use the wi-fi adapter.  The only workaround for this is
             // probably for the user to modify the virtual switch.
             //
-            // This last issue is really just another indication that clusters aren't 
-            // really portable in the sense that you can't expect to relocate a cluster 
+            // This last issue is really just another indication that neonHIVEs aren't 
+            // really portable in the sense that you can't expect to relocate a hive 
             // from one network environment to another (that's why we bought the portable 
             // routers for motel use). So we'll consider this as by design.
 
