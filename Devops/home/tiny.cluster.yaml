@@ -1,0 +1,27 @@
+Name: home-tiny
+Datacenter: woodinville
+Environment: development
+TimeSources:
+- pool.ntp.org
+AllowUnitTesting: true
+Kubernetes:
+  AllowPodsOnMasters: true
+Ceph:
+  OSDDriveSize: 32GiB
+Hosting:
+  Environment: hyperv-local
+  VmDriveFolder: D:\\VM
+Network:
+  PremiseSubnet: 10.0.0.0/16
+  NodesSubnet: 10.0.0.0/16
+  IstioMutualTls: true
+NodeOptions:
+   Upgrade: none
+   PasswordLength: 20
+Nodes:
+   master-0:
+     Role: master
+     PrivateAddress: 10.0.0.30
+     Labels:
+       Custom:
+          io.neonkube/test: foo
