@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27130.2036
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30320.27
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Doc", "Doc", "{2CFE7466-98C4-490A-9519-4702DF7A4E15}"
 	ProjectSection(SolutionItems) = preProject
@@ -9,9 +9,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Doc", "Doc", "{2CFE7466-98C
 		Doc\Azure Network.vsdx = Doc\Azure Network.vsdx
 		Doc\Cheats.txt = Doc\Cheats.txt
 		Doc\DOWNLOADS.md = Doc\DOWNLOADS.md
-		Doc\Hive Traffic Managers.docx = Doc\Hive Traffic Managers.docx
 		Doc\Hive Notes.docx = Doc\Hive Notes.docx
 		Doc\Hive Secrets.docx = Doc\Hive Secrets.docx
+		Doc\Hive Traffic Managers.docx = Doc\Hive Traffic Managers.docx
 		Doc\Release Versioning.docx = Doc\Release Versioning.docx
 		Doc\RELEASE.md = Doc\RELEASE.md
 		Doc\SUDO and WinSCP.docx = Doc\SUDO and WinSCP.docx
@@ -277,16 +277,44 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "neon-proxy", "Services\neon
 EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		Lib\Neon.Global\Neon.Global.projitems*{08b7000c-f261-4543-b611-5710d12263db}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{11edbc14-0bf4-4c6b-86dd-3d292845c62a}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{167c080e-3f81-4eb7-93bd-1d8671b51835}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{19339d20-5d28-4b90-be83-92fdecb361bf}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{22ca72ee-ffa9-412a-b995-d51c617b8fef}*SharedItemsImports = 5
 		Test\Test.Neon.Models.shared\Test.Neon.Models.shared.projitems*{29e7763d-85d9-4174-92e1-df739099a36a}*SharedItemsImports = 13
+		Lib\Neon.Global\Neon.Global.projitems*{468e440f-2284-483d-a54a-ec540c85f76e}*SharedItemsImports = 5
 		Lib\Neon.Global\Neon.Global.projitems*{4c0bca49-f217-436c-877f-40a606989af4}*SharedItemsImports = 13
+		Lib\Neon.Global\Neon.Global.projitems*{5443e291-c0f4-4ec6-97cf-999e4b8f28be}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{592ffce1-0d8c-4797-9b3a-5f5f7e5e935b}*SharedItemsImports = 5
 		Lib\Neon.Couchbase.Lite.shared\Neon.Couchbase.Lite.shared.projitems*{5d528831-61ad-41c3-8bb4-50ababf9ae99}*SharedItemsImports = 4
 		Lib\Neon.Global\Neon.Global.projitems*{5d528831-61ad-41c3-8bb4-50ababf9ae99}*SharedItemsImports = 4
+		Lib\Neon.Global\Neon.Global.projitems*{626e630a-03d5-4578-88b1-31b0e6011e2c}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{66229c6d-ec7e-4340-8bc0-6c9e6ef830c6}*SharedItemsImports = 5
 		Lib\Neon.Global\Neon.Global.projitems*{6e39ddc8-e5a0-4284-ad2a-327dee029b2a}*SharedItemsImports = 4
 		Test\Test.Neon.Couchbase.shared\Test.Neon.Couchbase.shared.projitems*{6e39ddc8-e5a0-4284-ad2a-327dee029b2a}*SharedItemsImports = 4
 		Test\Test.Neon.Models.shared\Test.Neon.Models.shared.projitems*{6e39ddc8-e5a0-4284-ad2a-327dee029b2a}*SharedItemsImports = 4
+		Lib\Neon.Global\Neon.Global.projitems*{7017af13-9c49-4c31-8304-9354d86e2886}*SharedItemsImports = 5
 		Lib\Neon.Global\Neon.Global.projitems*{756fb86b-29bc-4c6b-a19b-a624a9e9d367}*SharedItemsImports = 4
+		Lib\Neon.Global\Neon.Global.projitems*{77dd54d0-3f03-4b34-af83-abfd430400f0}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{7ec9d996-b464-4493-bf68-8a4a95aa3c83}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{7fde666c-facb-401f-9adb-19e7998a4e95}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{803a4763-4b6e-42af-adbb-61227369b5ae}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{8168805e-1f13-4475-83b5-859ffa663062}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{8315c918-4c26-435c-ac32-47a87cb2792e}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{893c943f-c1a7-448b-aacf-825db9560ab4}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{8b2b63ba-ac1f-4f34-ae1a-ed4c08642e82}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{8d3bd5ba-aaf6-4233-879f-69a63eb6cda1}*SharedItemsImports = 5
 		Lib\Neon.Couchbase.Lite.shared\Neon.Couchbase.Lite.shared.projitems*{8d7fe880-9006-488f-bab3-3a82011cd699}*SharedItemsImports = 13
+		Lib\Neon.Global\Neon.Global.projitems*{95cd429a-c7c0-41ce-89b6-df20db78b297}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{a6fe18dc-60dd-48d8-bf2e-4432718efd42}*SharedItemsImports = 5
 		Test\Test.Neon.Couchbase.shared\Test.Neon.Couchbase.shared.projitems*{c18157d4-7665-4565-b56c-153cdad69361}*SharedItemsImports = 13
+		Lib\Neon.Global\Neon.Global.projitems*{c23307a1-4e5a-4b83-a8eb-90de334868c6}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{c33788b7-d2d0-42f9-a786-6e0419a97731}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{c3cbc486-6217-49d5-afa2-38efebf3fcbd}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{cce84513-2514-4158-acf5-0477ea74ad9f}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{cd08b37a-614c-4deb-9805-adbd77da3f8e}*SharedItemsImports = 5
+		Lib\Neon.Global\Neon.Global.projitems*{ee0dfef2-ec42-4e49-857d-48baae14bbe6}*SharedItemsImports = 5
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
